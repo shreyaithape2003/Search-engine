@@ -12,7 +12,7 @@ env/
 
 # These are automatically generated when Python runs/imports modules.
 
-**pycache**/
+__pycache__/
 *.py[cod]
 
 # Pytest cache
@@ -20,6 +20,7 @@ env/
 # Automatically generated when running tests with pytest.
 
 .pytest_cache/
+.ruff_cache/
 
 # Environment/secrets files
 
