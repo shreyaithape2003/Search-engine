@@ -47,14 +47,29 @@ class DocumentIngestor:
             content_hash=extracted.content_hash,
         )
 
+        existing = self._find_existing_document(document_data)
+        if existing is not None:
+            return existing
+
         try:
             return self.repository.create(document_data)
         except DuplicateDocumentError:
-            existing = self.repository.get_by_url(document_data.url)
-            if existing is None and document_data.canonical_url is not None:
-                existing = self.repository.get_by_canonical_url(
-                    document_data.canonical_url
-                )
+            existing = self._find_existing_document(document_data)
             if existing is not None:
                 return existing
             raise
+
+    def _find_existing_document(
+        self,
+        document_data: DocumentCreate,
+    ) -> Document | None:
+        for candidate_url in (document_data.url, document_data.canonical_url):
+            if candidate_url is None:
+                continue
+            existing = self.repository.get_by_url(candidate_url)
+            if existing is not None:
+                return existing
+            existing = self.repository.get_by_canonical_url(candidate_url)
+            if existing is not None:
+                return existing
+        return None
