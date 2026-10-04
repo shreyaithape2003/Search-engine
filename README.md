@@ -5,17 +5,18 @@ accessible educational resources across school, university, professional,
 technical, academic, and research domains. It is a focused vertical search
 engine, not a replacement for general-purpose search engines.
 
-## Phase 1 status
+## Phase 2 status
 
-The project foundation is in place: a small FastAPI backend, a health check,
-and a responsive landing/search screen. Search itself is not implemented yet;
-submitting the form displays a clear "coming soon" message and does not show
-fabricated results.
+Phase 1 provides the FastAPI health check and a responsive landing/search
+screen. Phase 2 adds the document model, SQLite persistence, Pydantic data
+schemas, a focused repository, and deterministic development sample data.
+EduSearch still does not crawl websites or perform searches.
 
 ## Technology stack
 
 - Python 3.12+
 - FastAPI and Pydantic Settings
+- SQLAlchemy 2.x and SQLite
 - Uvicorn
 - pytest and HTTPX
 - Plain HTML, CSS, and JavaScript for the initial UI
@@ -51,8 +52,79 @@ The API runs at <http://127.0.0.1:8000>. Check
 <http://127.0.0.1:8000/health> for the service health response and open
 <http://127.0.0.1:8000/docs> for interactive OpenAPI documentation.
 
-The backend accepts `EDUSEARCH_SERVICE_NAME` and `EDUSEARCH_LOG_LEVEL`
-environment variables. The defaults are `EduSearch` and `INFO`.
+The backend accepts `EDUSEARCH_SERVICE_NAME`, `EDUSEARCH_LOG_LEVEL`, and
+`EDUSEARCH_DATABASE_URL` environment variables. Defaults are `EduSearch`,
+`INFO`, and `sqlite:///./edusearch.db`. The default database is a local file
+in the current working directory; SQLite is included with Python and does not
+need a separate server or installation.
+
+## Phase 2 data layer
+
+The storage path is:
+
+```text
+FastAPI
+  -> DocumentRepository
+  -> SQLAlchemy 2.x session
+  -> SQLite
+```
+
+`Document` stores the resource URL and canonical URL, its derived domain,
+educational metadata, text, ordered headings, a content hash, and separate
+source/EduSearch timestamps. Headings are a JSON array of strings in one
+SQLite column; this preserves heading order without introducing a separate
+table. URL and non-null canonical URL values are unique. `content_hash` is
+indexed, not unique, so storing identical content at multiple URLs is not
+prematurely prohibited.
+
+The `DocumentRepository` accepts a SQLAlchemy session and provides
+`create`, `get_by_id`, `get_by_url`, `list`, `update`, and `delete`. Duplicate
+URL or canonical URL writes are reported as `DuplicateDocumentError`. URL
+values are validated as HTTP(S) URLs in Pydantic schemas. `created_at` and
+`updated_at` are EduSearch timestamps; `source_updated_at` describes the
+original resource when that metadata is known. Stored timestamps are
+normalized to timezone-aware UTC values.
+
+The engine and session factory are configured in `app.db.database`. Importing
+the app does not create a database or tables. Initialize the schema explicitly
+from the repository root:
+
+```powershell
+python -m app.db.init_db
+```
+
+For a custom location, set `EDUSEARCH_DATABASE_URL` before running that
+command, for example:
+
+```powershell
+$env:EDUSEARCH_DATABASE_URL = "sqlite:///./local-edusearch.db"
+python -m app.db.init_db
+```
+
+The same configuration is used by the optional sample-data command:
+
+```powershell
+python -m app.db.seed
+```
+
+This adds four deterministic development examples (university course,
+technical documentation, science education, and professional learning).
+Repeated runs skip existing sample URLs; the data is text and metadata only
+and does not require network access. The default `edusearch.db` file is ignored
+by Git.
+
+## Example development workflow
+
+```powershell
+python -m pip install -r requirements.txt
+python -m app.db.init_db
+python -m app.db.seed
+python -m uvicorn app.main:app --reload
+```
+
+The database operations are not currently exposed as HTTP endpoints. `/health`
+continues to report application health, and the static Phase 1 UI remains
+unchanged.
 
 ## Open the UI
 
@@ -66,14 +138,20 @@ presentation-only until a later milestone adds search functionality.
 python -m pytest
 ```
 
-## Current limitations
+Phase 2 tests create a fresh temporary SQLite database for each test; they do
+not read from or write to the developer's local database.
 
-- No search endpoint, search index, or real search results.
-- No crawler, persistence, ranking, semantic search, or AI features.
+## Current limitations and scope
+
+- No web crawler, robots.txt handling, URL discovery, HTML download, or HTML
+  parsing.
+- No search endpoint, index, BM25, vector search, semantic search, ranking,
+  PageRank, or real search results.
+- No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The landing page is static and is not served by FastAPI.
 
 ## Upcoming phases
 
-Later milestones can add search behavior, educational content ingestion,
-indexing and retrieval, evaluation, and additional product capabilities. Each
-will be implemented incrementally; none is included in Phase 1.
+Later milestones may add ingestion, indexing and retrieval, evaluation, and
+additional product capabilities. Those phases will be implemented
+incrementally; none is included in Phase 2.
