@@ -208,10 +208,36 @@ Phase 4A returns in-memory crawl result models only. It does not write fetched
 pages to `documents`, expose a crawler API, or add search functionality.
 Crawler tests use mocked HTTP responses and do not access the network.
 
+## Phase 4B HTML extraction and ingestion
+
+The ingestion flow is:
+
+```text
+CrawlPage
+  -> local HTML extraction
+  -> DocumentCreate
+  -> DocumentRepository
+  -> SQLite
+```
+
+Phase 4B parses fetched HTML locally with Beautiful Soup, normalizes extracted
+titles, descriptions, headings, body text, and available metadata, and stores
+the result through the existing `DocumentRepository`. Canonical URLs are
+normalized and must remain within the SeedSource hostname and allowed URL
+prefixes; otherwise ingestion falls back to the fetched page URL. A stable
+SHA-256 hash is generated from normalized title, headings, and body content.
+SeedSource `source_type` is retained; subject and education level are only
+copied when the source metadata has a single unambiguous value.
+
+Repeated ingestion uses existing URL/canonical URL uniqueness rules and
+returns the existing document rather than creating a duplicate. `CrawlPage`
+remains an in-memory crawler result, separate from the persisted `Document`
+model. There is still no search functionality.
+
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
-- No persistence/ingestion of crawler output into the `Document` table.
+- No sophisticated article extraction or educational content classification.
 - No search endpoint, index, BM25, vector search, semantic search, ranking,
   PageRank, or real search results.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
