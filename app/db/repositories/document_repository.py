@@ -45,6 +45,11 @@ class DocumentRepository:
         statement = select(Document).where(Document.url == normalized_url)
         return self.session.scalar(statement)
 
+    def get_by_canonical_url(self, url: str | HttpUrl) -> Document | None:
+        normalized_url = str(HttpUrl(str(url)))
+        statement = select(Document).where(Document.canonical_url == normalized_url)
+        return self.session.scalar(statement)
+
     def list(self, limit: int = 100, offset: int = 0) -> list[Document]:
         if limit < 1 or limit > 500:
             raise ValueError("limit must be between 1 and 500.")

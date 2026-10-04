@@ -5,12 +5,15 @@ accessible educational resources across school, university, professional,
 technical, academic, and research domains. It is a focused vertical search
 engine, not a replacement for general-purpose search engines.
 
-## Phase 2 status
+## Project status
 
 Phase 1 provides the FastAPI health check and a responsive landing/search
 screen. Phase 2 adds the document model, SQLite persistence, Pydantic data
 schemas, a focused repository, and deterministic development sample data.
-EduSearch still does not crawl websites or perform searches.
+Phase 3 adds the curated SeedSource registry. Phase 4A provides the crawler
+foundation. Phase 4B adds HTML and metadata extraction, canonical URL handling,
+content hashing, Document creation, and SQLite persistence. EduSearch still
+does not perform searches.
 
 ## Technology stack
 
@@ -178,15 +181,65 @@ python -m app.db.seed_sources
 The seed command performs no network requests. It skips start URLs already in
 the database, so a repeat run reports zero additional source records.
 
-Phase 3 only prepares the persistent source registry. It does not crawl,
-download, or parse websites. Crawling, URL discovery, and robots.txt handling
-remain future responsibilities; a later phase can build crawler behavior
-against this registry.
+Phase 3 prepared the persistent source registry but did not crawl, download,
+or parse websites. The development crawler described below is the first
+crawling functionality and uses this registry as its configuration.
+
+## Phase 4A development crawler
+
+The generic asynchronous crawler reads configuration from a `SeedSource` and
+fetches HTML pages in breadth-first order. It checks the exact hostname and
+configured allowed URL prefixes before following discovered links. The start
+URL itself is allowed even when the source uses narrower prefixes to limit
+links discovered from its landing page.
+
+Robots rules are parsed with Python's standard-library `urllib.robotparser`
+and cached per origin for each crawl. When `robots.txt` cannot be retrieved,
+the crawler conservatively denies the page and records the reason; it does
+not assume permission. Redirects are followed manually so each target is
+checked against both scope and robots rules.
+
+Development defaults cap a crawl at 20 attempted pages and depth 2, use a
+10-second request timeout, wait one second between requests, identify as
+`EduSearchBot/0.1`, and limit each response to 5 MB. Only HTML and XHTML are
+accepted; a small standard-library HTML parser extracts anchor links. HTTP
+requests are asynchronous and sequential. These safeguards are for
+development crawling, not production-scale crawling.
+
+Phase 4A returns in-memory crawl result models only. It does not write fetched
+pages to `documents`, expose a crawler API, or add search functionality.
+Crawler tests use mocked HTTP responses and do not access the network.
+
+## Phase 4B HTML extraction and ingestion
+
+The ingestion flow is:
+
+```text
+CrawlPage
+  -> local HTML extraction
+  -> DocumentCreate
+  -> DocumentRepository
+  -> SQLite
+```
+
+Phase 4B parses fetched HTML locally with Beautiful Soup, normalizes extracted
+titles, descriptions, headings, body text, and available metadata, and stores
+the result through the existing `DocumentRepository`. Canonical URLs are
+normalized and must remain within the SeedSource hostname and allowed URL
+prefixes; otherwise ingestion falls back to the fetched page URL. A stable
+SHA-256 hash is generated from normalized title, headings, and body content.
+SeedSource `source_type` is retained; subject and education level are only
+copied when the source metadata has a single unambiguous value.
+
+Repeated ingestion uses existing URL/canonical URL uniqueness rules and
+returns the existing document rather than creating a duplicate. `CrawlPage`
+remains an in-memory crawler result, separate from the persisted `Document`
+model. There is still no search functionality.
 
 ## Current limitations and scope
 
-- No web crawler, robots.txt handling, URL discovery, HTML download, or HTML
-  parsing.
+- No production crawler or distributed crawling.
+- No sophisticated article extraction or educational content classification.
 - No search endpoint, index, BM25, vector search, semantic search, ranking,
   PageRank, or real search results.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
@@ -194,7 +247,5 @@ against this registry.
 
 ## Upcoming phases
 
-The next phase can implement carefully scoped crawling and ingestion from the
-curated registry, including robots.txt handling. Indexing, retrieval,
-evaluation, and other product capabilities remain later milestones; none is
-included in Phase 3.
+The next major phase is inverted-index and keyword-retrieval infrastructure.
+Search functionality is not implemented yet.
