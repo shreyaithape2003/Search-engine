@@ -22,6 +22,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Local development database
+
+edusearch.db
+
 # Environment/secrets files
 
 # These may contain local configuration or sensitive values such as API keys.

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     service_name: str = "EduSearch"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    database_url: str = "sqlite:///./edusearch.db"
 
 
 settings = Settings()
