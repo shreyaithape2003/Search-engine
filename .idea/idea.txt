@@ -1,0 +1,567 @@
+🎓 An Educational Web Search Engine
+
+A search engine dedicated exclusively to learning and educational knowledge, covering users from school students to researchers.
+
+The interesting part is that we're not limiting it to one subject. We're limiting it by purpose: learning/education.
+
+The scope could be:
+User group	Examples
+🧒 School	Mathematics, physics, chemistry, history, geography
+🎓 College	Engineering, commerce, science, arts, law, etc.
+💻 Technology	Programming, AI, cloud, cybersecurity, databases
+📊 Management	MBA, finance, marketing, HR, operations
+🧬 Medical	Medicine, biology, anatomy, pharmacology
+🔬 Research	Papers, journals, preprints, technical articles
+📚 General learning	Tutorials, documentation, educational blogs
+🛠️ Professional	AWS, Python, Git, Docker, certifications
+📖 Reference	Encyclopedic/reference educational material
+
+So the product isn't:
+
+"Search the entire internet."
+
+It's:
+
+"Search the educational internet."
+
+Why I like this direction
+
+There is an important distinction.
+
+A generic search engine has an enormous problem:
+
+Internet
+──────────────
+10 billion+ pages
+     ↓
+How do I compete with Google?
+
+Our engine has:
+
+Educational Web
+──────────────────────
+Educational websites
+Documentation
+Tutorials
+Articles
+Research
+Courses
+Reference material
+Academic resources
+     ↓
+Specialized search
+
+That gives us a clear product identity.
+
+We're no longer trying to compete with Google at everything.
+
+We're building a vertical search engine.
+
+But I would make one important change
+
+I wouldn't call the project simply:
+
+"Educational Search Engine"
+
+That's somewhat generic.
+
+I'd position it as:
+
+EduSearch — A Specialized Educational Web Search Engine
+
+or potentially a more distinctive name later.
+
+The core promise:
+
+Find reliable learning resources, not the entire internet.
+
+And that gives us some very interesting ranking problems.
+
+The REAL opportunity: educational relevance
+
+Suppose someone searches:
+
+photosynthesis
+
+Google could return:
+
+Wikipedia
+YouTube
+News article
+Shopping result
+Social media
+Blog
+Educational website
+
+Our search engine should prioritize:
+
+1. Educational explanation
+2. School-level resource
+3. University-level resource
+4. Scientific/academic resource
+5. Reference material
+
+And eventually allow the user to specify:
+
+Level:
+○ School
+○ Undergraduate
+○ Postgraduate
+○ Research
+○ Professional
+
+Subject:
+○ Science
+○ Engineering
+○ Medicine
+○ Business
+○ Computer Science
+○ Mathematics
+○ Humanities
+○ etc.
+
+Now we're doing something interesting.
+
+Even better: one query, different learning levels
+
+Consider:
+
+"What is machine learning?"
+
+A school student might want:
+
+Machine learning explained simply.
+
+An engineering student might want:
+
+Machine learning algorithms and mathematical foundations.
+
+A researcher might want:
+
+Recent papers on machine learning methodology.
+
+So our search engine could eventually understand:
+
+Query
+  ↓
+Intent Detection
+  ↓
+Educational Level
+  ↓
+Subject
+  ↓
+Search
+  ↓
+Ranking
+
+That's considerably more sophisticated than ordinary keyword search.
+
+This also gives us a fantastic ranking system
+
+Remember our earlier ranking plan?
+
+We can now make it education-specific.
+
+Instead of:
+
+Final Score =
+BM25
++ semantic similarity
++ PageRank
++ freshness
+
+we could eventually have:
+
+Educational Relevance Score
+        │
+        ├── BM25 relevance
+        ├── Semantic similarity
+        ├── Title relevance
+        ├── Heading relevance
+        ├── Content quality
+        ├── Domain authority
+        ├── Educational source type
+        ├── Academic credibility
+        ├── Freshness
+        ├── Reading level
+        ├── Duplicate penalty
+        └── Spam/low-quality penalty
+
+That becomes a real search-ranking engineering problem.
+
+And we can classify sources
+
+This could become one of the project's strongest features.
+
+For example:
+
+Source type
+University
+Government
+Research
+Documentation
+Educational organization
+Textbook/reference
+Educational blog
+Tutorial
+Professional certification
+
+Then the result could show:
+
+MIT OpenCourseWare
+──────────────────
+University • Course Material
+
+Introduction to Algorithms
+
+Learn fundamental algorithms...
+
+or:
+
+Python Documentation
+─────────────────────
+Official Documentation
+
+Python Functions
+
+A function is a block of reusable...
+
+or:
+
+Research Paper
+───────────────
+Academic Research
+
+Attention Is All You Need
+
+Research paper • 2017
+
+The search results become much more useful for learning.
+
+We can also add an "Education Level" filter
+
+Eventually:
+
+Search: "Newton's laws"
+
+┌─────────────────────────────────────────┐
+│ Level                                   │
+│                                         │
+│ ☑ All                                   │
+│ ○ School                                │
+│ ○ Undergraduate                         │
+│ ○ Postgraduate                          │
+│ ○ Research                              │
+└─────────────────────────────────────────┘
+
+And:
+
+Subject
+────────────────
+☑ All
+○ Physics
+○ Engineering
+○ Mathematics
+○ Science
+
+This is something we'll design into our document metadata from the beginning.
+
+This changes our database design
+
+Instead of storing only:
+
+URL
+Title
+Text
+Timestamp
+
+we can eventually store:
+
+Document
+│
+├── URL
+├── Title
+├── Description
+├── Content
+├── Headings
+├── Author
+├── Publisher
+├── Domain
+├── Language
+├── CrawledAt
+├── PublishedAt
+│
+├── Educational metadata
+│   ├── SourceType
+│   ├── Subject
+│   ├── EducationLevel
+│   ├── ContentType
+│   └── Difficulty
+│
+├── Search metadata
+│   ├── BM25 statistics
+│   ├── Embedding
+│   ├── PageRank
+│   └── ContentHash
+│
+└── Quality metadata
+    ├── Authority
+    ├── SpamScore
+    └── DuplicateScore
+
+This is why I think deciding the niche before coding the crawler is important.
+
+And the crawler becomes smarter
+
+We don't want:
+
+Crawler
+   ↓
+crawl everything
+
+We want:
+
+Educational Seed Sources
+          ↓
+      Crawler
+          ↓
+    Discover Links
+          ↓
+Educational Relevance Classifier
+          ↓
+     ┌────┴────┐
+     ↓         ↓
+ Educational  Reject
+     ↓
+ Document Store
+
+For example, if we encounter a page that is clearly unrelated to education, the system can eventually reject or deprioritize it.
+
+But there is one major challenge
+
+We should not promise that every educational resource on the internet will be available.
+
+That's technically unrealistic.
+
+There are:
+
+billions of web pages
+paywalls
+robots.txt restrictions
+private course platforms
+dynamically generated content
+copyrighted material
+websites that block crawlers
+rapidly changing content
+
+So our project description should say something like:
+
+A specialized search engine for discovering publicly accessible educational resources across academic, technical, professional, and research domains.
+
+That's technically defensible.
+
+The really exciting part: AI + educational search
+
+This niche gives our AI layer a genuine purpose.
+
+Imagine:
+
+Normal search
+
+User:
+
+Explain TCP/IP.
+
+Results:
+
+10 links
+
+Our system:
+
+Search
+ ↓
+Retrieve educational sources
+ ↓
+Rank sources
+ ↓
+AI summarizes them
+ ↓
+Cite the sources
+
+Result:
+
+TCP/IP explained
+
+TCP/IP is a networking model that defines how devices communicate...
+
+Sources
+
+Official documentation
+University course material
+Educational article
+
+Then:
+
+Want this explained at:
+
+🧒 School level
+🎓 College level
+🔬 Research level
+
+That's where this project starts becoming much more than a search box.
+
+We can even create "Learning Mode"
+
+This could eventually be one of our flagship features.
+
+User searches:
+
+binary search tree
+
+Then:
+
+┌─────────────────────────────────────────┐
+│ Binary Search Tree                      │
+├─────────────────────────────────────────┤
+│                                         │
+│ 📖 Learn                                │
+│ Beginner explanation                    │
+│                                         │
+│ 🧠 Concepts                             │
+│ • Binary tree                           │
+│ • Node                                   │
+│ • Traversal                             │
+│                                         │
+│ 💻 Examples                             │
+│ Python implementation                   │
+│                                         │
+│ 🎓 University resources                 │
+│                                         │
+│ 🔬 Research                             │
+│                                         │
+│ 📝 Practice                             │
+│                                         │
+└─────────────────────────────────────────┘
+
+And the AI could generate:
+
+"If you already understand binary trees, skip to..."
+
+This would use our search engine's retrieved documents rather than making the AI the source of truth.
+
+Another excellent feature: Research Mode
+
+For advanced users:
+
+Research Mode
+──────────────
+
+Query:
+"Impact of generative AI on software development"
+
+Search
+    ↓
+Retrieve 100 candidates
+    ↓
+Filter duplicates
+    ↓
+Rank academic sources
+    ↓
+Group by themes
+    ↓
+Summarize
+    ↓
+Show sources
+
+Output:
+
+Key themes
+
+1. Developer productivity
+2. Code quality
+3. Security
+4. Developer skill changes
+5. Human-AI collaboration
+
+Sources
+────────
+Academic papers
+Technical reports
+University research
+Industry research
+
+That would be an excellent demonstration of:
+
+Search + NLP + AI + information retrieval.
+
+-----------------------------------------------------------------------------------------------------------
+
+EduSearch — Hybrid Educational Web Search Engine
+
+Purpose:
+
+Search and discover high-quality publicly accessible educational resources across school, university, professional, technical, academic, and research domains.
+
+Core pipeline
+                 EDUCATIONAL WEB
+                       │
+                       ↓
+                ┌─────────────┐
+                │   Crawler   │
+                └──────┬──────┘
+                       ↓
+                ┌─────────────┐
+                │  Classifier │
+                │ Educational?│
+                └──────┬──────┘
+                       ↓
+                ┌─────────────┐
+                │  Documents  │
+                └──────┬──────┘
+                       ↓
+           ┌───────────────────────┐
+           │       INDEXING        │
+           │                       │
+           │ Inverted Index        │
+           │ BM25                  │
+           │ Vector Index          │
+           │ Link Graph            │
+           └───────────┬───────────┘
+                       ↓
+                    SEARCH
+                       ↓
+              ┌────────────────┐
+              │ Hybrid Ranking │
+              └───────┬────────┘
+                      ↓
+                 Search Results
+                      ↓
+                ┌─────┴─────┐
+                ↓           ↓
+             Search       AI Layer
+               UI            │
+                            ↓
+                    Learning / Research
+                         Features
+And our continuous improvement loop becomes:
+Collect
+   ↓
+Classify
+   ↓
+Index
+   ↓
+Retrieve
+   ↓
+Rank
+   ↓
+Measure
+   ↓
+Analyze failed searches
+   ↓
+Improve ranking
+   ↓
+Improve classification
+   ↓
+Improve crawling
+   ↓
+Repeat
