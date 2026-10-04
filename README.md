@@ -138,8 +138,50 @@ presentation-only until a later milestone adds search functionality.
 python -m pytest
 ```
 
-Phase 2 tests create a fresh temporary SQLite database for each test; they do
-not read from or write to the developer's local database.
+Phase 2 and Phase 3 database tests create fresh temporary SQLite databases;
+they do not read from or write to the developer's local database.
+
+## Phase 3 curated seed sources
+
+A `SeedSource` is a curated website entry point and metadata for a future
+crawler; it is not a `Document`. A document represents one educational
+resource, while a seed source describes a website from which a future phase
+may discover resources. Keeping the registry curated gives ingestion an
+intentional set of educational sources and scoped URL prefixes to start from.
+
+```text
+Curated educational sources
+  -> SeedSource registry
+  -> SQLite
+  -> Future crawler
+```
+
+The `seed_sources` table stores each source's name, HTTPS start URL, derived
+hostname, description, source type, education levels, subjects, allowed URL
+prefixes, active status, priority, and UTC creation/update timestamps. The
+start URL is unique; domains are indexed but not unique. URL prefixes and
+categorical lists are stored as JSON arrays. The registry has no public API
+endpoints.
+
+Initialize both Phase 2 and Phase 3 tables with the existing command:
+
+```powershell
+python -m app.db.init_db
+```
+
+Insert the 12 deterministic curated sources with:
+
+```powershell
+python -m app.db.seed_sources
+```
+
+The seed command performs no network requests. It skips start URLs already in
+the database, so a repeat run reports zero additional source records.
+
+Phase 3 only prepares the persistent source registry. It does not crawl,
+download, or parse websites. Crawling, URL discovery, and robots.txt handling
+remain future responsibilities; a later phase can build crawler behavior
+against this registry.
 
 ## Current limitations and scope
 
@@ -152,6 +194,7 @@ not read from or write to the developer's local database.
 
 ## Upcoming phases
 
-Later milestones may add ingestion, indexing and retrieval, evaluation, and
-additional product capabilities. Those phases will be implemented
-incrementally; none is included in Phase 2.
+The next phase can implement carefully scoped crawling and ingestion from the
+curated registry, including robots.txt handling. Indexing, retrieval,
+evaluation, and other product capabilities remain later milestones; none is
+included in Phase 3.
