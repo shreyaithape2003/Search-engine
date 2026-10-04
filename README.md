@@ -10,8 +10,10 @@ engine, not a replacement for general-purpose search engines.
 Phase 1 provides the FastAPI health check and a responsive landing/search
 screen. Phase 2 adds the document model, SQLite persistence, Pydantic data
 schemas, a focused repository, and deterministic development sample data.
-Phase 3 adds the curated SeedSource registry. Phase 4A adds a bounded
-development crawler; EduSearch still does not perform searches.
+Phase 3 adds the curated SeedSource registry. Phase 4A provides the crawler
+foundation. Phase 4B adds HTML and metadata extraction, canonical URL handling,
+content hashing, Document creation, and SQLite persistence. EduSearch still
+does not perform searches.
 
 ## Technology stack
 
@@ -245,6 +247,5 @@ model. There is still no search functionality.
 
 ## Upcoming phases
 
-The next incremental step can connect in-memory crawl results to document
-ingestion and persistence. Indexing, retrieval, evaluation, and search
-functionality remain future work.
+The next major phase is inverted-index and keyword-retrieval infrastructure.
+Search functionality is not implemented yet.
