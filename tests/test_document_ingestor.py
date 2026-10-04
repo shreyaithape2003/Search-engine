@@ -143,6 +143,58 @@ def test_duplicate_canonical_url_returns_existing_document(session: Session) -> 
     assert repository.list() == [first]
 
 
+def test_new_url_matching_existing_canonical_url_returns_existing_document(
+    session: Session,
+) -> None:
+    source = make_source(session)
+    repository = DocumentRepository(session)
+    ingestor = DocumentIngestor(repository)
+    existing = ingestor.ingest(
+        make_page(
+            '<link rel="canonical" href="/learn/page-b"><title>Existing</title>',
+            "https://example.edu/learn/page-a",
+        ),
+        source,
+    )
+
+    result = ingestor.ingest(
+        make_page(
+            '<link rel="canonical" href="/learn/page-c"><title>New content</title>',
+            "https://example.edu/learn/page-b",
+        ),
+        source,
+    )
+
+    assert result.id == existing.id
+    assert repository.list() == [existing]
+
+
+def test_new_canonical_url_matching_existing_url_returns_existing_document(
+    session: Session,
+) -> None:
+    source = make_source(session)
+    repository = DocumentRepository(session)
+    ingestor = DocumentIngestor(repository)
+    existing = ingestor.ingest(
+        make_page(
+            '<link rel="canonical" href="/learn/page-b"><title>Existing</title>',
+            "https://example.edu/learn/page-a",
+        ),
+        source,
+    )
+
+    result = ingestor.ingest(
+        make_page(
+            '<link rel="canonical" href="/learn/page-a"><title>New content</title>',
+            "https://example.edu/learn/page-c",
+        ),
+        source,
+    )
+
+    assert result.id == existing.id
+    assert repository.list() == [existing]
+
+
 def test_external_canonical_url_falls_back_and_malformed_html_ingests(
     session: Session,
 ) -> None:
