@@ -12,8 +12,10 @@ screen. Phase 2 adds the document model, SQLite persistence, Pydantic data
 schemas, a focused repository, and deterministic development sample data.
 Phase 3 adds the curated SeedSource registry. Phase 4A provides the crawler
 foundation. Phase 4B adds HTML and metadata extraction, canonical URL handling,
-content hashing, Document creation, and SQLite persistence. EduSearch still
-does not perform searches.
+content hashing, Document creation, and SQLite persistence. Phase 5 adds
+field-aware tokenization, a SQLite inverted-index foundation, and
+term/document/field statistics. BM25 ranking, the search API, frontend search,
+semantic/vector search, and AI search are not implemented.
 
 ## Technology stack
 
@@ -234,18 +236,34 @@ copied when the source metadata has a single unambiguous value.
 Repeated ingestion uses existing URL/canonical URL uniqueness rules and
 returns the existing document rather than creating a duplicate. `CrawlPage`
 remains an in-memory crawler result, separate from the persisted `Document`
-model. There is still no search functionality.
+model.
+
+## Phase 5 inverted-index foundation
+
+The indexing flow is:
+
+```text
+Documents in SQLite
+  -> field-aware tokenization
+  -> inverted-index postings and field statistics
+  -> SQLite
+```
+
+Phase 5 indexes title, description, headings, and body separately. It stores
+term frequencies, token positions, document lengths per field, and term
+statistics. Re-indexing replaces the document's previous postings and
+statistics. This is index infrastructure only: BM25 ranking, the search API,
+frontend search, semantic/vector search, and AI search are not implemented.
 
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No search endpoint, index, BM25, vector search, semantic search, ranking,
-  PageRank, or real search results.
+- No BM25 ranking, search endpoint, frontend search, vector search, semantic
+  search, ranking, PageRank, or real search results.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The landing page is static and is not served by FastAPI.
 
 ## Upcoming phases
 
-The next major phase is inverted-index and keyword-retrieval infrastructure.
-Search functionality is not implemented yet.
+The next major phase is BM25 ranking over the Phase 5 inverted index.
