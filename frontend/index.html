@@ -58,15 +58,30 @@
               placeholder="What would you like to learn?"
               autocomplete="off"
             />
-            <button type="submit">
+            <button id="search-button" type="submit">
               <span>Search</span>
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </button>
           </form>
-          <p class="search-status" id="search-status" aria-live="polite"></p>
+          <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
           <p class="search-caption">Search educational resources</p>
+        </section>
+
+        <section
+          class="results-section"
+          id="results-section"
+          aria-label="Search results"
+          aria-live="polite"
+          aria-busy="false"
+          hidden
+        >
+          <div class="results-heading">
+            <h2 id="results-title"></h2>
+            <span class="loading-indicator" id="loading-indicator" aria-hidden="true" hidden></span>
+          </div>
+          <ol class="results-list" id="results-list"></ol>
         </section>
       </main>
     </div>
