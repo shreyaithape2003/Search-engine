@@ -31,4 +31,5 @@ def initialize_database(database_engine: Engine = engine) -> None:
     """Create the tables for all registered models when explicitly requested."""
     import_module("app.models.document")
     import_module("app.models.seed_source")
+    import_module("app.indexing.models")
     Base.metadata.create_all(bind=database_engine)
