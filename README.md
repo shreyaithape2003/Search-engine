@@ -126,12 +126,17 @@ by Git.
 python -m pip install -r requirements.txt
 python -m app.db.init_db
 python -m app.db.seed
-python -m uvicorn app.main:app --reload
+python -m app.db.build_index
+uvicorn app.main:app --reload
 ```
 
-The database operations are not currently exposed as HTTP endpoints. `/health`
-continues to report application health. Serve the browser UI separately as
-described below.
+The seed command creates development Documents. `build_index` rebuilds the
+SQLite inverted index from persisted Documents using the existing Phase 5
+indexer; it is safe to run repeatedly and reports when there are no Documents
+to index. This is an explicit development workflow, not a change to the
+crawler or ingestion pipeline. The database operations are not exposed as HTTP
+endpoints. `/health` continues to report application health. Serve the browser
+UI separately as described below.
 
 ## Open the UI
 
