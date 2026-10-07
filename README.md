@@ -252,18 +252,33 @@ Documents in SQLite
 Phase 5 indexes title, description, headings, and body separately. It stores
 term frequencies, token positions, document lengths per field, and term
 statistics. Re-indexing replaces the document's previous postings and
-statistics. This is index infrastructure only: BM25 ranking, the search API,
-frontend search, semantic/vector search, and AI search are not implemented.
+statistics.
+
+## Phase 6 BM25 ranking
+
+Phase 6 ranks matching documents from the inverted index using field-aware
+Okapi BM25. Each field uses its own document frequency and length statistics.
+The configurable defaults are `k1=1.2`, `b=0.75`, and field weights of title
+`4.0`, headings `2.5`, description `2.0`, and body `1.0`.
+
+```text
+query -> existing tokenizer -> inverted-index postings -> BM25
+      -> weighted field scores -> ranked document IDs
+```
+
+This provides ranking infrastructure only. A public search API and functional
+frontend search remain future phases; semantic/vector search and AI search are
+not implemented.
 
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No BM25 ranking, search endpoint, frontend search, vector search, semantic
-  search, ranking, PageRank, or real search results.
+- No search endpoint, frontend search, vector search, semantic search,
+  PageRank, or real search results.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The landing page is static and is not served by FastAPI.
 
 ## Upcoming phases
 
-The next major phase is BM25 ranking over the Phase 5 inverted index.
+The next major phase is the public search API built on the BM25 ranking engine.

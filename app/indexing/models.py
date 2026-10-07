@@ -81,3 +81,10 @@ class TermStatistics:
     document_frequency: int
     collection_term_frequency: int
     indexed_document_count: int
+
+
+@dataclass(frozen=True)
+class FieldCollectionStatistics:
+    field: str
+    document_count: int
+    total_document_length: int
