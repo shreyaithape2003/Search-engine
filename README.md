@@ -14,12 +14,13 @@ Phase 3 adds the curated SeedSource registry. Phase 4A provides the crawler
 foundation. Phase 4B adds HTML and metadata extraction, canonical URL handling,
 content hashing, Document creation, and SQLite persistence. Phase 5 adds
 field-aware tokenization, a SQLite inverted-index foundation, and
-term/document/field statistics. BM25 ranking, the search API, frontend search,
-semantic/vector search, and AI search are not implemented.
+term/document/field statistics. Phase 6 adds field-aware BM25 ranking. Phase 7
+exposes that ranking through a versioned FastAPI search endpoint. The frontend
+remains static; semantic/vector search and AI search are not implemented.
 
 ## Technology stack
 
-- Python 3.12+
+- Python 3.11.3
 - FastAPI and Pydantic Settings
 - SQLAlchemy 2.x and SQLite
 - Uvicorn
@@ -266,19 +267,56 @@ query -> existing tokenizer -> inverted-index postings -> BM25
       -> weighted field scores -> ranked document IDs
 ```
 
-This provides ranking infrastructure only. A public search API and functional
-frontend search remain future phases; semantic/vector search and AI search are
-not implemented.
+Phase 6 provides ranking infrastructure; Phase 7 exposes it through the
+versioned search API. Functional frontend search remains a future phase;
+semantic/vector search and AI search are not implemented.
+
+## Phase 7 Search API
+
+Phase 7 exposes the existing BM25 engine through `GET /api/v1/search`.
+
+```text
+GET /api/v1/search?q=machine+learning&limit=20
+```
+
+The API validates the query and limit, ranks candidates from the inverted
+index, bulk-fetches only the requested ranked documents, and returns their
+titles, URLs, descriptions, scores, and matched terms in BM25 order. The
+default limit is 10 and the maximum is 50.
+
+Example response:
+
+```json
+{
+  "query": "machine learning",
+  "results": [
+    {
+      "document_id": 42,
+      "title": "Machine Learning",
+      "url": "https://example.edu/machine-learning",
+      "description": "An introduction to machine learning.",
+      "score": 5.31,
+      "matched_terms": ["machine", "learning"]
+    }
+  ],
+  "total": 1
+}
+```
+
+`total` is the number of valid results returned for the requested limit. The
+endpoint does not provide snippets, highlighting, autocomplete, filters,
+educational ranking, or frontend search. Semantic/vector search and AI answers
+are also deferred.
 
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No search endpoint, frontend search, vector search, semantic search,
-  PageRank, or real search results.
+- No frontend search, vector search, semantic search, PageRank, snippets,
+  highlighting, autocomplete, filters, or educational ranking.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The landing page is static and is not served by FastAPI.
 
 ## Upcoming phases
 
-The next major phase is the public search API built on the BM25 ranking engine.
+The next major phase is frontend integration with the Phase 7 search API.

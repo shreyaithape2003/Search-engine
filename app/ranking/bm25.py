@@ -7,6 +7,10 @@ from app.ranking.models import BM25Config, RankedDocument
 INDEXED_FIELDS = ("title", "headings", "description", "body")
 
 
+class QueryLimitError(ValueError):
+    """Raised when an otherwise valid query exceeds ranker resource limits."""
+
+
 class BM25Ranker:
     """Rank matching indexed documents with field-aware Okapi BM25."""
 
@@ -23,14 +27,14 @@ class BM25Ranker:
         if not isinstance(query, str):
             raise TypeError("query must be a string.")
         if len(query) > self.config.maximum_query_length:
-            raise ValueError(
+            raise QueryLimitError(
                 "query exceeds the maximum length of "
                 f"{self.config.maximum_query_length} characters."
             )
 
         query_terms = list(dict.fromkeys(tokenize(query)))
         if len(query_terms) > self.config.maximum_unique_terms:
-            raise ValueError(
+            raise QueryLimitError(
                 "query exceeds the maximum of "
                 f"{self.config.maximum_unique_terms} unique terms."
             )
