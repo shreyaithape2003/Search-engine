@@ -5,6 +5,7 @@ from typing import AsyncGenerator, Literal
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.api.v1.search import router as search_router
 from app.core.config import settings
 
 logging.basicConfig(
@@ -32,6 +33,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.include_router(search_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])

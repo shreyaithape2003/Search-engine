@@ -40,6 +40,19 @@ class DocumentRepository:
     def get_by_id(self, document_id: int) -> Document | None:
         return self.session.get(Document, document_id)
 
+    def get_by_ids(self, document_ids: list[int]) -> list[Document]:
+        """Fetch multiple documents with one query."""
+        unique_ids = sorted(set(document_ids))
+        if not unique_ids:
+            return []
+
+        statement = (
+            select(Document)
+            .where(Document.id.in_(unique_ids))
+            .order_by(Document.id)
+        )
+        return list(self.session.scalars(statement).all())
+
     def get_by_url(self, url: str | HttpUrl) -> Document | None:
         normalized_url = str(HttpUrl(str(url)))
         statement = select(Document).where(Document.url == normalized_url)
