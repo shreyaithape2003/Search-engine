@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.indexing.models import (
     DocumentFieldStatistics,
+    FieldCollectionStatistics,
     FieldStatisticsData,
     IndexPosting,
     PostingData,
@@ -80,12 +81,79 @@ class IndexRepository:
         tokens = tokenize(term)
         if len(tokens) != 1:
             return []
+        return self.get_postings_for_terms(tokens)
+
+    def get_postings_for_terms(self, normalized_terms: list[str]) -> list[IndexPosting]:
+        """Retrieve postings for already-normalized terms in one database query."""
+        normalized_terms = sorted(set(normalized_terms))
+        if not normalized_terms:
+            return []
+
         statement = (
             select(IndexPosting)
-            .where(IndexPosting.term == tokens[0])
-            .order_by(IndexPosting.document_id, IndexPosting.field)
+            .where(IndexPosting.term.in_(normalized_terms))
+            .order_by(IndexPosting.term, IndexPosting.document_id, IndexPosting.field)
         )
         return list(self.session.scalars(statement).all())
+
+    def get_field_collection_statistics(
+        self,
+    ) -> dict[str, FieldCollectionStatistics]:
+        """Return indexed-document count and total length for each field."""
+        statement = (
+            select(
+                DocumentFieldStatistics.field,
+                func.count(DocumentFieldStatistics.document_id),
+                func.coalesce(func.sum(DocumentFieldStatistics.document_length), 0),
+                func.min(DocumentFieldStatistics.document_length),
+            )
+            .group_by(DocumentFieldStatistics.field)
+        )
+        statistics: dict[str, FieldCollectionStatistics] = {}
+        for field, document_count, total_length, minimum_length in self.session.execute(
+            statement
+        ).all():
+            if minimum_length is not None and minimum_length < 0:
+                raise ValueError(
+                    f"Negative document length found for indexed field {field!r}."
+                )
+            statistics[field] = FieldCollectionStatistics(
+                field=field,
+                document_count=document_count,
+                total_document_length=total_length,
+            )
+        return statistics
+
+    def get_field_statistics_for_terms(
+        self,
+        normalized_terms: list[str],
+    ) -> dict[int, dict[str, int]]:
+        """Return lengths for candidate documents matching normalized terms."""
+        normalized_terms = sorted(set(normalized_terms))
+        if not normalized_terms:
+            return {}
+
+        candidate_document_ids = (
+            select(IndexPosting.document_id)
+            .where(IndexPosting.term.in_(normalized_terms))
+            .distinct()
+        )
+        statement = (
+            select(
+                DocumentFieldStatistics.document_id,
+                DocumentFieldStatistics.field,
+                DocumentFieldStatistics.document_length,
+            )
+            .where(DocumentFieldStatistics.document_id.in_(candidate_document_ids))
+            .order_by(
+                DocumentFieldStatistics.document_id,
+                DocumentFieldStatistics.field,
+            )
+        )
+        statistics: dict[int, dict[str, int]] = {}
+        for document_id, field, document_length in self.session.execute(statement).all():
+            statistics.setdefault(document_id, {})[field] = document_length
+        return statistics
 
     def get_document_statistics(self, document_id: int) -> dict[str, int]:
         statement = (
