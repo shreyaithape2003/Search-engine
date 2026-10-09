@@ -6,6 +6,7 @@ class SearchResult(BaseModel):
     title: str | None
     url: str
     description: str | None
+    snippet: str
     score: float = Field(allow_inf_nan=False)
     matched_terms: list[str]
 

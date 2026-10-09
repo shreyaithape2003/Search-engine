@@ -16,7 +16,8 @@ content hashing, Document creation, and SQLite persistence. Phase 5 adds
 field-aware tokenization, a SQLite inverted-index foundation, and
 term/document/field statistics. Phase 6 adds field-aware BM25 ranking. Phase 7
 exposes that ranking through a versioned FastAPI search endpoint. The frontend
-connects to the API in Phase 8 and displays real BM25-backed results.
+connects to the API in Phase 8 and displays real BM25-backed results. Phase 9
+adds concise query-relevant snippets and safe query-term highlighting.
 Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
@@ -295,8 +296,9 @@ GET /api/v1/search?q=machine+learning&limit=20
 
 The API validates the query and limit, ranks candidates from the inverted
 index, bulk-fetches only the requested ranked documents, and returns their
-titles, URLs, descriptions, scores, and matched terms in BM25 order. The
-default limit is 10 and the maximum is 50.
+titles, URLs, descriptions, scores, and matched terms in BM25 order. Phase 9
+also adds one bounded text snippet per result. The default limit is 10 and the
+maximum is 50.
 
 Example response:
 
@@ -309,6 +311,7 @@ Example response:
       "title": "Machine Learning",
       "url": "https://example.edu/machine-learning",
       "description": "An introduction to machine learning.",
+      "snippet": "An introduction to machine learning.",
       "score": 5.31,
       "matched_terms": ["machine", "learning"]
     }
@@ -318,9 +321,8 @@ Example response:
 ```
 
 `total` is the number of valid results returned for the requested limit. The
-endpoint does not provide snippets, highlighting, autocomplete, filters,
-or educational ranking. Semantic/vector search and AI answers are also
-deferred.
+endpoint does not provide autocomplete, filters, or educational ranking.
+Semantic/vector search and AI answers are also deferred.
 
 ## Phase 8 frontend integration
 
@@ -328,21 +330,49 @@ The browser now submits searches to the Phase 7 API and displays real results
 in the order returned by BM25. It provides loading feedback, empty-query
 validation, a friendly no-results message, and a user-friendly error state for
 API, network, or malformed-response failures. Search scores and other ranking
-internals are not shown.
+internals are not shown. Phase 9 displays the API-provided snippet and marks
+case-insensitive query-token matches without inserting API content as HTML.
 
-Snippets, highlighting, filters, autocomplete, semantic/vector search, and AI
-answers are not implemented.
+## Phase 9 snippets and highlighting
+
+Each result includes a plain-text snippet capped at 240 characters. Selection
+checks the description first, then stored headings, then body text, preferring
+a short passage that covers the greatest number of distinct query terms.
+Ellipses indicate omitted text. If no available field matches, the snippet
+uses the start of the first non-empty field in that same order. This does not
+change candidate retrieval, BM25 scores, matched terms, or result ordering;
+the API still bulk-fetches result documents and does not return the body as a
+separate field.
+
+The browser highlights whole query tokens in the snippet with `<mark>` and
+safe DOM text nodes. Case differences, Unicode normalization, multiple terms,
+and punctuation are handled without treating document content as markup.
+Search filtering, autocomplete, semantic/vector search, and AI answers remain
+out of scope.
+
+Run the automated test suite from the repository root:
+
+```powershell
+python -m pytest
+```
+
+To manually verify snippets and highlighting, initialize and seed the local
+database, build its index, start the API, and serve the frontend as described
+above. Search for `machine learning`, then check that the displayed snippet
+contains the matching passage and both query terms are highlighted. Also try
+a query with mixed case and punctuation, such as `Python, programming!`.
+Frontend behavior has no dedicated automated browser test setup in this
+project, so these visual checks remain manual.
 
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No vector search, semantic search, PageRank, snippets, highlighting,
-  autocomplete, filters, or educational ranking.
+- No vector search, semantic search, PageRank, autocomplete, filters, or
+  educational ranking.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The frontend is served separately from the FastAPI application.
 
 ## Upcoming phases
 
-The next major phase is search quality improvements such as snippets,
-highlighting, and filters.
+The next major phase is search quality improvements such as filters.
