@@ -7,6 +7,8 @@ from app.indexing.tokenizer import tokenize
 class SnippetGenerator:
     """Select a short, query-relevant passage from stored document text."""
 
+    _MAX_CANDIDATES = 64
+
     def __init__(self, maximum_length: int = 240) -> None:
         if maximum_length < 1:
             raise ValueError("maximum_length must be a positive integer.")
@@ -51,27 +53,43 @@ class SnippetGenerator:
                     matching_anchors[term] = (span, span)
 
             if matching_anchors:
-                starts = {0}
+                starts = [0]
+                seen_starts = {0}
                 for first, last in matching_anchors.values():
-                    for start, _ in {first, last}:
-                        starts.update(
-                            (
-                                max(0, start - self.maximum_length // 3),
-                                max(0, start - self.maximum_length // 2),
-                                start,
-                            )
-                        )
+                    for match_start, _ in (first, last):
+                        for candidate_start in (
+                            max(0, match_start - self.maximum_length // 2),
+                            match_start,
+                        ):
+                            if candidate_start not in seen_starts:
+                                seen_starts.add(candidate_start)
+                                starts.append(candidate_start)
+                                if len(starts) >= self._MAX_CANDIDATES:
+                                    break
+                        if len(starts) >= self._MAX_CANDIDATES:
+                            break
+                    if len(starts) >= self._MAX_CANDIDATES:
+                        break
+
                 for start in starts:
                     snippet, excerpt_start, excerpt_end = self._excerpt(text, start)
-                    included = list(
-                        self._token_spans(text[excerpt_start:excerpt_end])
+                    included_terms = (
+                        term
+                        for term in self._matching_terms(
+                            text,
+                            excerpt_start,
+                            excerpt_end,
+                            query_terms,
+                        )
                     )
-                    included_terms = [
-                        term for term, _, _ in included if term in query_terms
-                    ]
+                    distinct_terms: set[str] = set()
+                    match_count = 0
+                    for term in included_terms:
+                        distinct_terms.add(term)
+                        match_count += 1
                     key = (
-                        len(set(included_terms)),
-                        len(included_terms),
+                        len(distinct_terms),
+                        match_count,
                         -field_order,
                         -excerpt_start,
                     )
@@ -115,31 +133,100 @@ class SnippetGenerator:
                 if next_space >= 0:
                     start = next_space + 1
 
-        leading_ellipsis = start > 0
-        end = min(
-            len(text),
-            start + self.maximum_length - int(leading_ellipsis),
-        )
-        if end < len(text):
-            end -= 1
+        while start < len(text) and text[start].isspace():
+            start += 1
+        if start >= len(text):
+            return "", len(text), len(text)
+
+        while True:
+            available_length = self.maximum_length - int(start > 0)
+            if available_length <= 0:
+                return "…", start, start
+            remaining_length = len(text) - start
+            if remaining_length <= available_length:
+                end = len(text)
+                break
+
+            content_budget = available_length - 1
+            if content_budget <= 0:
+                return "…", start, start
+            target_end = start + content_budget
             boundary = next(
                 (
                     index
-                    for index in range(end, start, -1)
-                    if text[index - 1].isspace()
+                    for index in range(target_end - 1, start, -1)
+                    if text[index].isspace()
                 ),
                 -1,
             )
             if boundary > start:
                 end = boundary
+                break
 
-        excerpt = text[start:end].strip()
-        snippet = f"{'…' if leading_ellipsis else ''}{excerpt}"
-        if end < len(text):
-            snippet += "…"
-        if len(snippet) > self.maximum_length:
-            snippet = snippet[: self.maximum_length - 1].rstrip() + "…"
+            next_boundary = next(
+                (
+                    index
+                    for index in range(target_end, len(text))
+                    if text[index].isspace()
+                ),
+                -1,
+            )
+            if next_boundary == target_end:
+                end = target_end
+                break
+            if next_boundary >= 0:
+                start = next_boundary + 1
+                while start < len(text) and text[start].isspace():
+                    start += 1
+                if start >= len(text):
+                    return "…", len(text), len(text)
+                continue
+
+            # An unbroken token longer than the limit cannot fit whole.
+            end = target_end
+            break
+
+        while end > start and text[end - 1].isspace():
+            end -= 1
+
+        snippet = (
+            f"{'…' if start > 0 else ''}"
+            f"{text[start:end]}"
+            f"{'…' if end < len(text) else ''}"
+        )
         return snippet, start, end
+
+    def _matching_terms(
+        self,
+        text: str,
+        start: int,
+        end: int,
+        query_terms: set[str],
+    ) -> Iterator[str]:
+        excerpt = text[start:end]
+        left_is_partial = (
+            start > 0
+            and end > start
+            and self._is_token_character(text[start - 1])
+            and self._is_token_character(text[start])
+        )
+        right_is_partial = (
+            end < len(text)
+            and end > start
+            and self._is_token_character(text[end - 1])
+            and self._is_token_character(text[end])
+        )
+        for term, token_start, token_end in self._token_spans(excerpt):
+            if left_is_partial and token_start == 0:
+                continue
+            if right_is_partial and token_end == len(excerpt):
+                continue
+            if term in query_terms:
+                yield term
+
+    @staticmethod
+    def _is_token_character(character: str) -> bool:
+        return unicodedata.category(character)[0] in {"L", "N", "M"}
 
     @staticmethod
     def _token_spans(text: str) -> Iterator[tuple[str, int, int]]:

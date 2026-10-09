@@ -121,6 +121,83 @@ def test_long_text_is_truncated_with_ellipsis_at_both_ends() -> None:
     assert "biology" in snippet
 
 
+def test_excerpt_range_matches_displayed_text_without_ellipses() -> None:
+    generator = SnippetGenerator(maximum_length=32)
+    text = "  opening text " + ("filler " * 8) + " biology lesson " + (
+        "ending " * 8
+    )
+
+    snippet, start, end = generator._excerpt(text, text.index("biology"))
+
+    assert snippet == f"…{text[start:end]}…"
+    assert snippet[1:-1] == text[start:end]
+    assert len(snippet) <= generator.maximum_length
+
+
+def test_excerpt_scoring_ignores_query_tokens_cut_at_excerpt_boundaries() -> None:
+    generator = SnippetGenerator(maximum_length=3)
+
+    assert list(generator._matching_terms("biology", 0, 3, {"bio"})) == []
+    assert list(generator._matching_terms("biology", 4, 7, {"ogy"})) == []
+
+
+def test_query_matches_near_excerpt_boundaries_are_not_counted_when_cut() -> None:
+    generator = SnippetGenerator(maximum_length=24)
+    text = ("biology " * 40) + "chemistry"
+
+    snippet, start, end = generator._excerpt(text, text.index("chemistry") + 2)
+
+    assert snippet.removeprefix("…").removesuffix("…") == text[start:end]
+    assert start == text.index("chemistry")
+    assert end == len(text)
+    assert "chemistry" in snippet
+
+
+def test_multiple_query_terms_are_selected_from_the_same_excerpt() -> None:
+    generator = SnippetGenerator(maximum_length=48)
+    text = ("algebra appears early. " * 12) + (
+        "Geometry and algebra solve related problems. "
+    ) + ("geometry appears late. " * 12)
+
+    snippet = generator.generate("algebra geometry", body=text)
+
+    assert "algebra" in snippet.lower()
+    assert "geometry" in snippet.lower()
+    assert len(snippet) <= generator.maximum_length
+
+
+def test_candidate_generation_is_bounded_and_deterministic() -> None:
+    class CountingGenerator(SnippetGenerator):
+        excerpt_calls = 0
+
+        def _excerpt(self, text: str, desired_start: int) -> tuple[str, int, int]:
+            self.excerpt_calls += 1
+            return super()._excerpt(text, desired_start)
+
+    generator = CountingGenerator(maximum_length=40)
+    text = "biology " * 10_000
+
+    first = generator.generate("biology", body=text)
+    first_count = generator.excerpt_calls
+    generator.excerpt_calls = 0
+    second = generator.generate("biology", body=text)
+
+    assert first == second
+    assert first_count <= generator._MAX_CANDIDATES
+    assert generator.excerpt_calls <= generator._MAX_CANDIDATES
+
+
+@pytest.mark.parametrize("maximum_length", [1, 2, 3, 24, 60])
+def test_snippet_never_exceeds_maximum_length(maximum_length: int) -> None:
+    generator = SnippetGenerator(maximum_length=maximum_length)
+    snippet = generator.generate(
+        "biology",
+        body="Beginning " + ("biology lesson " * 30) + "ending",
+    )
+
+    assert len(snippet) <= maximum_length
+
+
 def test_regex_metacharacters_in_query_are_safe() -> None:
     snippet = SnippetGenerator().generate(
         "C++ (arrays)",
