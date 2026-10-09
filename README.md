@@ -16,7 +16,8 @@ content hashing, Document creation, and SQLite persistence. Phase 5 adds
 field-aware tokenization, a SQLite inverted-index foundation, and
 term/document/field statistics. Phase 6 adds field-aware BM25 ranking. Phase 7
 exposes that ranking through a versioned FastAPI search endpoint. The frontend
-remains static; semantic/vector search and AI search are not implemented.
+connects to the API in Phase 8 and displays real BM25-backed results.
+Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
 
@@ -33,7 +34,7 @@ From the repository root, create and activate a virtual environment, then
 install the dependencies:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
@@ -125,18 +126,31 @@ by Git.
 python -m pip install -r requirements.txt
 python -m app.db.init_db
 python -m app.db.seed
-python -m uvicorn app.main:app --reload
+python -m app.db.build_index
+uvicorn app.main:app --reload
 ```
 
-The database operations are not currently exposed as HTTP endpoints. `/health`
-continues to report application health, and the static Phase 1 UI remains
-unchanged.
+The seed command creates development Documents. `build_index` rebuilds the
+SQLite inverted index from persisted Documents using the existing Phase 5
+indexer; it is safe to run repeatedly and reports when there are no Documents
+to index. This is an explicit development workflow, not a change to the
+crawler or ingestion pipeline. The database operations are not exposed as HTTP
+endpoints. `/health` continues to report application health. Serve the browser
+UI separately as described below.
 
 ## Open the UI
 
-Open `frontend/index.html` in a browser. The landing page is a static frontend
-and does not need a separate server in this phase. The search form is
-presentation-only until a later milestone adds search functionality.
+Start the API using the instructions above, then serve the frontend from the
+repository root:
+
+```powershell
+python -m http.server 5500 --directory frontend
+```
+
+Open <http://127.0.0.1:5500>. Searches are sent to the local API at
+<http://127.0.0.1:8000>. The API permits the explicit localhost development
+origins on port 5500. Do not open the page using `file://`; use the local
+server so the browser can make the API request.
 
 ## Run tests
 
@@ -268,8 +282,8 @@ query -> existing tokenizer -> inverted-index postings -> BM25
 ```
 
 Phase 6 provides ranking infrastructure; Phase 7 exposes it through the
-versioned search API. Functional frontend search remains a future phase;
-semantic/vector search and AI search are not implemented.
+versioned search API. Phase 8 connects the browser interface to that API.
+Semantic/vector search and AI search are not implemented.
 
 ## Phase 7 Search API
 
@@ -305,18 +319,30 @@ Example response:
 
 `total` is the number of valid results returned for the requested limit. The
 endpoint does not provide snippets, highlighting, autocomplete, filters,
-educational ranking, or frontend search. Semantic/vector search and AI answers
-are also deferred.
+or educational ranking. Semantic/vector search and AI answers are also
+deferred.
+
+## Phase 8 frontend integration
+
+The browser now submits searches to the Phase 7 API and displays real results
+in the order returned by BM25. It provides loading feedback, empty-query
+validation, a friendly no-results message, and a user-friendly error state for
+API, network, or malformed-response failures. Search scores and other ranking
+internals are not shown.
+
+Snippets, highlighting, filters, autocomplete, semantic/vector search, and AI
+answers are not implemented.
 
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No frontend search, vector search, semantic search, PageRank, snippets,
-  highlighting, autocomplete, filters, or educational ranking.
+- No vector search, semantic search, PageRank, snippets, highlighting,
+  autocomplete, filters, or educational ranking.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
-- The landing page is static and is not served by FastAPI.
+- The frontend is served separately from the FastAPI application.
 
 ## Upcoming phases
 
-The next major phase is frontend integration with the Phase 7 search API.
+The next major phase is search quality improvements such as snippets,
+highlighting, and filters.
