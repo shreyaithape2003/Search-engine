@@ -304,6 +304,37 @@ def test_search_filter_with_no_matches_returns_empty_results(
     assert response.json()["total"] == 0
 
 
+@pytest.mark.parametrize("filter_name", ["subject", "content_type"])
+def test_other_specialized_is_applied_as_a_real_filter(
+    client: TestClient,
+    session: Session,
+    filter_name: str,
+) -> None:
+    matching_document = add_document(
+        session,
+        f"https://other-specialized-{filter_name}.edu/",
+        title="python specialized resource",
+        **{filter_name: "Other / Specialized"},
+    )
+    other_document = add_document(
+        session,
+        f"https://ordinary-{filter_name}.edu/",
+        title="python ordinary resource",
+        **{filter_name: "Computer Science" if filter_name == "subject" else "course"},
+    )
+    index_documents(session, matching_document, other_document)
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "python", filter_name: "Other / Specialized"},
+    )
+
+    assert response.status_code == 200
+    assert [
+        result["document_id"] for result in response.json()["results"]
+    ] == [matching_document.id]
+
+
 def test_empty_search_filters_behave_like_unfiltered_search(
     client: TestClient,
     session: Session,

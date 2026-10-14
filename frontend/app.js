@@ -9,7 +9,7 @@ const loadingIndicator = document.querySelector("#loading-indicator");
 const pageShell = document.querySelector(".page-shell");
 const searchWidget = document.querySelector("#search-widget");
 const suggestionList = document.querySelector("#suggestion-list");
-const filterInputs = [...document.querySelectorAll("[data-search-filter]")];
+const filterControls = [...document.querySelectorAll("[data-search-filter]")];
 const clearFiltersButton = document.querySelector("#clear-filters");
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -105,8 +105,8 @@ document.addEventListener("click", (event) => {
 });
 
 clearFiltersButton.addEventListener("click", () => {
-  for (const input of filterInputs) {
-    input.value = "";
+  for (const filter of filterControls) {
+    filter.value = "";
   }
   const query = searchQuery.value.trim();
   if (query) {
@@ -131,10 +131,10 @@ async function search(query) {
 
   const url = new URL("/api/v1/search", API_BASE_URL);
   const parameters = new URLSearchParams({ q: query, limit: String(RESULT_LIMIT) });
-  for (const input of filterInputs) {
-    const value = input.value.trim();
+  for (const filter of filterControls) {
+    const value = filter.value.trim();
     if (value) {
-      parameters.set(input.dataset.searchFilter, value);
+      parameters.set(filter.dataset.searchFilter, value);
     }
   }
   url.search = parameters;
@@ -413,8 +413,8 @@ function setStatus(message, state = "") {
 function setSearching(searching) {
   searchButton.disabled = searching;
   searchQuery.disabled = searching;
-  for (const input of filterInputs) {
-    input.disabled = searching;
+  for (const filter of filterControls) {
+    filter.disabled = searching;
   }
   clearFiltersButton.disabled = searching;
   searchForm.setAttribute("aria-busy", String(searching));

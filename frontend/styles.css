@@ -27,7 +27,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -316,7 +317,7 @@ h1 {
   text-align: left;
 }
 
-.filters-grid input {
+.filters-grid select {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -329,12 +330,13 @@ h1 {
   font-size: 12px;
 }
 
-.filters-grid input:focus {
+.filters-grid select:focus-visible {
   border-color: #bd858a;
   box-shadow: 0 0 0 2px rgb(168 95 107 / 13%);
+  outline: 0;
 }
 
-.filters-grid input:disabled {
+.filters-grid select:disabled {
   cursor: wait;
   opacity: 0.7;
 }

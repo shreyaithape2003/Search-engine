@@ -400,13 +400,21 @@ Suggestions reuse the existing term/document index and do not invoke BM25,
 scan document body text, or call an external service. Titles only become
 suggestions after their documents have been indexed.
 
+The primary filter UI is a collapsible row of three dropdowns: **Education
+level**, **Subject**, and **Resource type**. Their predefined choices make
+available values clear; “Any…” means no filter. “College / University” is
+sent as the stored `University` value. “Other / Specialized” is sent as an
+actual filter value, not as a request to ignore that field. Stored metadata is
+sparse, so a choice only returns documents whose field matches that value.
+Domain, language, and difficulty remain supported by the API but are not shown
+as primary filters. **Clear filters** resets the dropdowns and refreshes the
+current query.
+
 The frontend debounces suggestion requests, cancels or ignores stale requests,
 supports ArrowUp/ArrowDown, Enter, Escape, outside-click dismissal, and
-selection by click. Filters are compact optional text inputs in a collapsible
-row; **Clear filters** removes all active values and refreshes the current
-query. Search results retain the response's BM25 order, snippets, and query
-highlighting. API titles and suggestions are inserted as text, and filter
-values are sent as URL parameters rather than SQL.
+selection by click. Search results retain the response's BM25 order, snippets,
+and query highlighting. API titles and suggestions are inserted as text, and
+filter values are sent as URL parameters rather than SQL.
 
 Filter predicates use SQLAlchemy-bound values, not constructed SQL strings.
 Filter and suggestion endpoints return only IDs or bounded titles/results;

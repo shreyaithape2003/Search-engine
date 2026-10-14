@@ -82,29 +82,48 @@
             <summary>Filters</summary>
             <div class="filters-content">
               <div class="filters-grid">
-                <label>
+                <label for="filter-education-level">
                   <span>Education level</span>
-                  <input id="filter-education-level" data-search-filter="education_level" maxlength="100" autocomplete="off" />
+                  <select id="filter-education-level" data-search-filter="education_level">
+                    <option value="">Any level</option>
+                    <option value="School">School</option>
+                    <option value="University">College / University</option>
+                    <option value="Professional">Professional</option>
+                    <option value="Research">Research</option>
+                  </select>
                 </label>
-                <label>
+                <label for="filter-subject">
                   <span>Subject</span>
-                  <input id="filter-subject" data-search-filter="subject" maxlength="200" autocomplete="off" />
+                  <select id="filter-subject" data-search-filter="subject">
+                    <option value="">Any subject</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Medicine">Medicine</option>
+                    <option value="Business / MBA">Business / MBA</option>
+                    <option value="Economics">Economics</option>
+                    <option value="Humanities">Humanities</option>
+                    <option value="Social Sciences">Social Sciences</option>
+                    <option value="Other / Specialized">Other / Specialized</option>
+                  </select>
                 </label>
-                <label>
-                  <span>Content type</span>
-                  <input id="filter-content-type" data-search-filter="content_type" maxlength="100" autocomplete="off" />
-                </label>
-                <label>
-                  <span>Language</span>
-                  <input id="filter-language" data-search-filter="language" maxlength="35" autocomplete="off" />
-                </label>
-                <label>
-                  <span>Domain</span>
-                  <input id="filter-domain" data-search-filter="domain" maxlength="253" autocomplete="off" />
-                </label>
-                <label>
-                  <span>Difficulty</span>
-                  <input id="filter-difficulty" data-search-filter="difficulty" maxlength="50" autocomplete="off" />
+                <label for="filter-content-type">
+                  <span>Resource type</span>
+                  <select id="filter-content-type" data-search-filter="content_type">
+                    <option value="">Any resource type</option>
+                    <option value="course">Course</option>
+                    <option value="documentation">Documentation</option>
+                    <option value="article">Article</option>
+                    <option value="tutorial">Tutorial</option>
+                    <option value="research paper">Research Paper</option>
+                    <option value="lecture">Lecture</option>
+                    <option value="blog">Blog</option>
+                    <option value="study material">Study Material</option>
+                    <option value="Other / Specialized">Other / Specialized</option>
+                  </select>
                 </label>
               </div>
               <button class="clear-filters-button" id="clear-filters" type="button">
