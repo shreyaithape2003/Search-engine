@@ -45,26 +45,73 @@
       <main>
         <section class="hero" aria-labelledby="hero-title">
           <h1 id="hero-title">Find knowledge worth learning.</h1>
-          <form class="search-form" id="search-form" role="search">
-            <label class="visually-hidden" for="search-query">Search educational resources</label>
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.7" />
-              <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-            </svg>
-            <input
-              id="search-query"
-              name="q"
-              type="search"
-              placeholder="What would you like to learn?"
-              autocomplete="off"
-            />
-            <button id="search-button" type="submit">
-              <span>Search</span>
-              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <div class="search-widget" id="search-widget">
+            <form class="search-form" id="search-form" role="search">
+              <label class="visually-hidden" for="search-query">Search educational resources</label>
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.7" />
+                <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
               </svg>
-            </button>
-          </form>
+              <input
+                id="search-query"
+                name="q"
+                type="search"
+                placeholder="What would you like to learn?"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="suggestion-list"
+                aria-expanded="false"
+              />
+              <button id="search-button" type="submit">
+                <span>Search</span>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </form>
+            <ul
+              class="suggestion-list"
+              id="suggestion-list"
+              role="listbox"
+              aria-label="Search suggestions"
+              hidden
+            ></ul>
+          </div>
+          <details class="filters-panel">
+            <summary>Filters</summary>
+            <div class="filters-content">
+              <div class="filters-grid">
+                <label>
+                  <span>Education level</span>
+                  <input id="filter-education-level" data-search-filter="education_level" maxlength="100" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Subject</span>
+                  <input id="filter-subject" data-search-filter="subject" maxlength="200" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Content type</span>
+                  <input id="filter-content-type" data-search-filter="content_type" maxlength="100" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Language</span>
+                  <input id="filter-language" data-search-filter="language" maxlength="35" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Domain</span>
+                  <input id="filter-domain" data-search-filter="domain" maxlength="253" autocomplete="off" />
+                </label>
+                <label>
+                  <span>Difficulty</span>
+                  <input id="filter-difficulty" data-search-filter="difficulty" maxlength="50" autocomplete="off" />
+                </label>
+              </div>
+              <button class="clear-filters-button" id="clear-filters" type="button">
+                Clear filters
+              </button>
+            </div>
+          </details>
           <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
           <p class="search-caption">Search educational resources</p>
         </section>
