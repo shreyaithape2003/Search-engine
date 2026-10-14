@@ -45,26 +45,92 @@
       <main>
         <section class="hero" aria-labelledby="hero-title">
           <h1 id="hero-title">Find knowledge worth learning.</h1>
-          <form class="search-form" id="search-form" role="search">
-            <label class="visually-hidden" for="search-query">Search educational resources</label>
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.7" />
-              <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-            </svg>
-            <input
-              id="search-query"
-              name="q"
-              type="search"
-              placeholder="What would you like to learn?"
-              autocomplete="off"
-            />
-            <button id="search-button" type="submit">
-              <span>Search</span>
-              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <div class="search-widget" id="search-widget">
+            <form class="search-form" id="search-form" role="search">
+              <label class="visually-hidden" for="search-query">Search educational resources</label>
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.7" />
+                <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
               </svg>
-            </button>
-          </form>
+              <input
+                id="search-query"
+                name="q"
+                type="search"
+                placeholder="What would you like to learn?"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="suggestion-list"
+                aria-expanded="false"
+              />
+              <button id="search-button" type="submit">
+                <span>Search</span>
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </form>
+            <ul
+              class="suggestion-list"
+              id="suggestion-list"
+              role="listbox"
+              aria-label="Search suggestions"
+              hidden
+            ></ul>
+          </div>
+          <details class="filters-panel">
+            <summary>Filters</summary>
+            <div class="filters-content">
+              <div class="filters-grid">
+                <label for="filter-education-level">
+                  <span>Education level</span>
+                  <select id="filter-education-level" data-search-filter="education_level">
+                    <option value="">Any level</option>
+                    <option value="School">School</option>
+                    <option value="University">College / University</option>
+                    <option value="Professional">Professional</option>
+                    <option value="Research">Research</option>
+                  </select>
+                </label>
+                <label for="filter-subject">
+                  <span>Subject</span>
+                  <select id="filter-subject" data-search-filter="subject">
+                    <option value="">Any subject</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Medicine">Medicine</option>
+                    <option value="Business / MBA">Business / MBA</option>
+                    <option value="Economics">Economics</option>
+                    <option value="Humanities">Humanities</option>
+                    <option value="Social Sciences">Social Sciences</option>
+                    <option value="Other / Specialized">Other / Specialized</option>
+                  </select>
+                </label>
+                <label for="filter-content-type">
+                  <span>Resource type</span>
+                  <select id="filter-content-type" data-search-filter="content_type">
+                    <option value="">Any resource type</option>
+                    <option value="course">Course</option>
+                    <option value="documentation">Documentation</option>
+                    <option value="article">Article</option>
+                    <option value="tutorial">Tutorial</option>
+                    <option value="research paper">Research Paper</option>
+                    <option value="lecture">Lecture</option>
+                    <option value="blog">Blog</option>
+                    <option value="study material">Study Material</option>
+                    <option value="Other / Specialized">Other / Specialized</option>
+                  </select>
+                </label>
+              </div>
+              <button class="clear-filters-button" id="clear-filters" type="button">
+                Clear filters
+              </button>
+            </div>
+          </details>
           <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
           <p class="search-caption">Search educational resources</p>
         </section>

@@ -7,10 +7,21 @@ const resultsTitle = document.querySelector("#results-title");
 const resultsList = document.querySelector("#results-list");
 const loadingIndicator = document.querySelector("#loading-indicator");
 const pageShell = document.querySelector(".page-shell");
+const searchWidget = document.querySelector("#search-widget");
+const suggestionList = document.querySelector("#suggestion-list");
+const filterControls = [...document.querySelectorAll("[data-search-filter]")];
+const clearFiltersButton = document.querySelector("#clear-filters");
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 const RESULT_LIMIT = 10;
+const SUGGESTION_LIMIT = 6;
+const SUGGESTION_MINIMUM_LENGTH = 2;
+const SUGGESTION_DEBOUNCE_MS = 220;
 let isSearching = false;
+let suggestionTimer;
+let suggestionController;
+let suggestionRequestId = 0;
+let activeSuggestionIndex = -1;
 
 searchForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -33,9 +44,81 @@ searchQuery.addEventListener("input", () => {
   if (searchStatus.dataset.state === "validation") {
     setStatus("");
   }
+  scheduleSuggestions(searchQuery.value.trim());
+});
+
+searchQuery.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    if (!suggestionList.hidden) {
+      event.preventDefault();
+      cancelSuggestions();
+    }
+    return;
+  }
+
+  if (
+    event.key === "Enter" &&
+    !suggestionList.hidden &&
+    activeSuggestionIndex >= 0
+  ) {
+    event.preventDefault();
+    const selected = suggestionList.querySelectorAll('[role="option"]')[
+      activeSuggestionIndex
+    ];
+    if (selected) {
+      const suggestion = selected.textContent ?? "";
+      searchQuery.value = suggestion;
+      search(suggestion);
+    }
+    return;
+  }
+
+  if (suggestionList.hidden || !["ArrowDown", "ArrowUp"].includes(event.key)) {
+    return;
+  }
+
+  event.preventDefault();
+  const options = suggestionList.querySelectorAll('[role="option"]');
+  if (!options.length) {
+    return;
+  }
+  const direction = event.key === "ArrowDown" ? 1 : -1;
+  activeSuggestionIndex =
+    activeSuggestionIndex === -1
+      ? direction === 1
+        ? 0
+        : options.length - 1
+      : (activeSuggestionIndex + direction + options.length) % options.length;
+  options.forEach((option, index) => {
+    option.setAttribute("aria-selected", String(index === activeSuggestionIndex));
+  });
+  searchQuery.setAttribute(
+    "aria-activedescendant",
+    options[activeSuggestionIndex].id,
+  );
+});
+
+document.addEventListener("click", (event) => {
+  if (!searchWidget.contains(event.target)) {
+    cancelSuggestions();
+  }
+});
+
+clearFiltersButton.addEventListener("click", () => {
+  for (const filter of filterControls) {
+    filter.value = "";
+  }
+  const query = searchQuery.value.trim();
+  if (query) {
+    search(query);
+  }
 });
 
 async function search(query) {
+  if (isSearching) {
+    return;
+  }
+  cancelSuggestions();
   isSearching = true;
   setSearching(true);
   setStatus("");
@@ -47,7 +130,14 @@ async function search(query) {
   loadingIndicator.hidden = false;
 
   const url = new URL("/api/v1/search", API_BASE_URL);
-  url.search = new URLSearchParams({ q: query, limit: String(RESULT_LIMIT) });
+  const parameters = new URLSearchParams({ q: query, limit: String(RESULT_LIMIT) });
+  for (const filter of filterControls) {
+    const value = filter.value.trim();
+    if (value) {
+      parameters.set(filter.dataset.searchFilter, value);
+    }
+  }
+  url.search = parameters;
 
   try {
     const response = await fetch(url);
@@ -83,6 +173,107 @@ async function search(query) {
     resultsSection.setAttribute("aria-busy", "false");
     loadingIndicator.hidden = true;
   }
+}
+
+function scheduleSuggestions(query) {
+  cancelSuggestions();
+  if (query.length < SUGGESTION_MINIMUM_LENGTH) {
+    return;
+  }
+
+  const requestId = suggestionRequestId;
+  suggestionTimer = setTimeout(
+    () => fetchSuggestions(query, requestId),
+    SUGGESTION_DEBOUNCE_MS,
+  );
+}
+
+async function fetchSuggestions(query, requestId) {
+  const controller = new AbortController();
+  suggestionController = controller;
+  const url = new URL("/api/v1/search/suggestions", API_BASE_URL);
+  url.search = new URLSearchParams({
+    q: query,
+    limit: String(SUGGESTION_LIMIT),
+  });
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    if (
+      requestId !== suggestionRequestId ||
+      searchQuery.value.trim() !== query ||
+      !isValidSuggestionsResponse(payload)
+    ) {
+      return;
+    }
+    renderSuggestions(payload.suggestions);
+  } catch {
+    if (!controller.signal.aborted) {
+      closeSuggestions();
+    }
+  } finally {
+    if (suggestionController === controller) {
+      suggestionController = undefined;
+    }
+  }
+}
+
+function isValidSuggestionsResponse(payload) {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    typeof payload.query === "string" &&
+    Array.isArray(payload.suggestions) &&
+    payload.suggestions.length <= SUGGESTION_LIMIT &&
+    payload.suggestions.every((suggestion) => typeof suggestion === "string")
+  );
+}
+
+function renderSuggestions(suggestions) {
+  if (!suggestions.length) {
+    closeSuggestions();
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  suggestions.forEach((suggestion, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.id = `suggestion-option-${index}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.textContent = suggestion;
+    option.addEventListener("click", () => {
+      searchQuery.value = suggestion;
+      search(suggestion);
+    });
+    fragment.append(option);
+  });
+
+  suggestionList.replaceChildren(fragment);
+  suggestionList.hidden = false;
+  searchQuery.setAttribute("aria-expanded", "true");
+  activeSuggestionIndex = -1;
+}
+
+function cancelSuggestions() {
+  clearTimeout(suggestionTimer);
+  suggestionController?.abort();
+  suggestionController = undefined;
+  suggestionRequestId += 1;
+  closeSuggestions();
+}
+
+function closeSuggestions() {
+  suggestionList.replaceChildren();
+  suggestionList.hidden = true;
+  searchQuery.setAttribute("aria-expanded", "false");
+  searchQuery.removeAttribute("aria-activedescendant");
+  activeSuggestionIndex = -1;
 }
 
 function isValidSearchResponse(payload) {
@@ -222,6 +413,10 @@ function setStatus(message, state = "") {
 function setSearching(searching) {
   searchButton.disabled = searching;
   searchQuery.disabled = searching;
+  for (const filter of filterControls) {
+    filter.disabled = searching;
+  }
+  clearFiltersButton.disabled = searching;
   searchForm.setAttribute("aria-busy", String(searching));
   searchButton.querySelector("span").textContent = searching ? "Searching" : "Search";
 }

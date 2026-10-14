@@ -27,7 +27,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -125,6 +126,12 @@ h1 {
   box-shadow: 0 8px 24px rgb(48 43 42 / 6%);
 }
 
+.search-widget {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+
 .search-form:focus-within {
   border-color: #bd858a;
   box-shadow:
@@ -196,6 +203,162 @@ h1 {
 .search-form button svg {
   width: 17px;
   height: 17px;
+}
+
+.suggestion-list {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  max-height: min(320px, 55vh);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 12px 30px rgb(48 43 42 / 11%);
+  list-style: none;
+  text-align: left;
+}
+
+.suggestion-list[hidden] {
+  display: none;
+}
+
+.suggestion-list [role="option"] {
+  display: block;
+  width: 100%;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.suggestion-list [role="option"]:hover,
+.suggestion-list [role="option"][aria-selected="true"] {
+  background: #f5eeea;
+}
+
+.suggestion-list [role="option"]:focus-visible {
+  outline: 2px solid var(--rose);
+  outline-offset: -2px;
+}
+
+.filters-panel {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.filters-panel summary {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--rose-dark);
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.filters-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.filters-panel summary::after {
+  content: "+";
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.filters-panel[open] summary::after {
+  content: "−";
+}
+
+.filters-panel summary:hover {
+  background: #f5eeea;
+}
+
+.filters-panel summary:focus-visible,
+.clear-filters-button:focus-visible {
+  outline: 2px solid var(--rose);
+  outline-offset: 2px;
+}
+
+.filters-content {
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgb(255 253 250 / 72%);
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.filters-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
+}
+
+.filters-grid select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #e5dcd7;
+  border-radius: 6px;
+  outline: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+}
+
+.filters-grid select:focus-visible {
+  border-color: #bd858a;
+  box-shadow: 0 0 0 2px rgb(168 95 107 / 13%);
+  outline: 0;
+}
+
+.filters-grid select:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.clear-filters-button {
+  margin-top: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--rose-dark);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.clear-filters-button:hover {
+  background: #f5eeea;
+}
+
+.clear-filters-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .search-status {
@@ -374,6 +537,11 @@ h1 {
     gap: 10px;
     padding: 6px 7px 6px 14px;
     border-radius: 10px;
+  }
+
+  .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
   }
 
   .search-icon {

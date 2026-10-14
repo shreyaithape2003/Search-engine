@@ -220,7 +220,66 @@ def test_document_schemas_validate_urls_dates_and_ids() -> None:
 
 
 def test_sample_seed_is_development_only_and_idempotent(session: Session) -> None:
-    assert len(SAMPLE_DOCUMENTS) == 4
-    assert seed_sample_documents(session) == 4
+    assert len(SAMPLE_DOCUMENTS) == 20
+    assert seed_sample_documents(session) == len(SAMPLE_DOCUMENTS)
     assert seed_sample_documents(session) == 0
-    assert len(DocumentRepository(session).list()) == 4
+    assert len(DocumentRepository(session).list()) == len(SAMPLE_DOCUMENTS)
+
+
+def test_sample_seed_preserves_unrelated_documents(session: Session) -> None:
+    repository = DocumentRepository(session)
+    user_document = repository.create(
+        DocumentCreate(
+            url="https://my-development-resource.example.edu/",
+            title="My development resource",
+        )
+    )
+
+    assert seed_sample_documents(session) == len(SAMPLE_DOCUMENTS)
+    assert seed_sample_documents(session) == 0
+    assert repository.get_by_id(user_document.id) is user_document
+    assert len(repository.list()) == len(SAMPLE_DOCUMENTS) + 1
+
+
+def test_sample_seed_contains_known_filter_combinations() -> None:
+    samples_by_title = {sample.title: sample for sample in SAMPLE_DOCUMENTS}
+
+    assert any(
+        sample.education_level == "Professional"
+        and sample.subject == "Computer Science"
+        and sample.content_type == "tutorial"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert any(
+        sample.education_level == "School"
+        and sample.subject == "Mathematics"
+        and sample.content_type == "article"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert any(
+        sample.education_level == "University"
+        and sample.subject == "Computer Science"
+        and sample.content_type == "documentation"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert any(
+        sample.education_level == "University"
+        and sample.subject == "Physics"
+        and sample.content_type == "course"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert any(
+        sample.education_level == "Research"
+        and sample.subject == "Biology"
+        and sample.content_type == "research paper"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert any(
+        sample.subject == "Other / Specialized"
+        and sample.content_type == "Other / Specialized"
+        for sample in SAMPLE_DOCUMENTS
+    )
+    assert samples_by_title["Microsoft Learn"].subject == "Technology"
+    assert samples_by_title[
+        "Microsoft Learn Python Fundamentals Tutorial"
+    ].subject == "Computer Science"

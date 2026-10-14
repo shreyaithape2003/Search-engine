@@ -1,12 +1,13 @@
 from typing import Any
 
 from pydantic import HttpUrl
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.document import Document
 from app.schemas.document import DocumentCreate, DocumentUpdate
+from app.schemas.search import SearchFilters
 
 
 class DuplicateDocumentError(ValueError):
@@ -52,6 +53,20 @@ class DocumentRepository:
             .order_by(Document.id)
         )
         return list(self.session.scalars(statement).all())
+
+    def get_ids_matching_filters(self, filters: SearchFilters) -> set[int]:
+        """Return matching IDs without loading document content into Python."""
+        statement = select(Document.id)
+        for field, value in filters.model_dump(exclude_none=True).items():
+            column = getattr(Document, field)
+            if self.session.get_bind().dialect.name == "sqlite":
+                column = column.collate("EDUSEARCH_UNICODE_NOCASE")
+                comparison_value = value
+            else:
+                column = func.lower(column)
+                comparison_value = value.casefold()
+            statement = statement.where(column == comparison_value)
+        return set(self.session.scalars(statement).all())
 
     def get_by_url(self, url: str | HttpUrl) -> Document | None:
         normalized_url = str(HttpUrl(str(url)))

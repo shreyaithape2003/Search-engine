@@ -10,6 +10,7 @@ from app.indexing.models import (
     TermStatistics,
 )
 from app.indexing.tokenizer import tokenize
+from app.models.document import Document
 
 
 class IndexRepository:
@@ -95,6 +96,28 @@ class IndexRepository:
             .order_by(IndexPosting.term, IndexPosting.document_id, IndexPosting.field)
         )
         return list(self.session.scalars(statement).all())
+
+    def get_title_suggestions(self, prefix: str, limit: int) -> list[str]:
+        """Return title suggestions using the existing indexed title terms."""
+        upper_bound = f"{prefix}\U0010ffff"
+        statement = (
+            select(Document.title.collate("NOCASE"))
+            .join(IndexPosting, IndexPosting.document_id == Document.id)
+            .where(
+                IndexPosting.field == "title",
+                IndexPosting.term >= prefix,
+                IndexPosting.term < upper_bound,
+                Document.title.is_not(None),
+            )
+            .distinct()
+            .order_by(func.lower(Document.title), Document.title)
+            .limit(limit)
+        )
+        return [
+            title
+            for title in self.session.scalars(statement).all()
+            if title is not None
+        ]
 
     def get_field_collection_statistics(
         self,

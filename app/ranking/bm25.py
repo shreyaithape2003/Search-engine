@@ -22,7 +22,12 @@ class BM25Ranker:
         self.repository = repository
         self.config = config or BM25Config()
 
-    def rank(self, query: str) -> list[RankedDocument]:
+    def rank(
+        self,
+        query: str,
+        *,
+        eligible_document_ids: set[int] | None = None,
+    ) -> list[RankedDocument]:
         """Return matching document IDs sorted by score, then by ID."""
         if not isinstance(query, str):
             raise TypeError("query must be a string.")
@@ -39,6 +44,8 @@ class BM25Ranker:
                 f"{self.config.maximum_unique_terms} unique terms."
             )
         if not query_terms:
+            return []
+        if eligible_document_ids is not None and not eligible_document_ids:
             return []
 
         postings = self.repository.get_postings_for_terms(query_terms)
@@ -69,6 +76,14 @@ class BM25Ranker:
             field_postings[posting.document_id] = posting.term_frequency
             candidates.add(posting.document_id)
 
+        scoring_candidates = (
+            candidates
+            if eligible_document_ids is None
+            else candidates.intersection(eligible_document_ids)
+        )
+        if not scoring_candidates:
+            return []
+
         collection_statistics = self.repository.get_field_collection_statistics()
         if set(collection_statistics) != set(INDEXED_FIELDS):
             raise ValueError("Index field statistics are incomplete.")
@@ -97,9 +112,9 @@ class BM25Ranker:
                     f"Negative field length found for document {document_id}."
                 )
 
-        scores = {document_id: 0.0 for document_id in candidates}
+        scores = {document_id: 0.0 for document_id in scoring_candidates}
         matched_terms: dict[int, set[str]] = {
-            document_id: set() for document_id in candidates
+            document_id: set() for document_id in scoring_candidates
         }
         weights = self.config.field_weights
 
@@ -129,6 +144,8 @@ class BM25Ranker:
                     / (document_frequency + 0.5)
                 )
                 for document_id, term_frequency in document_frequencies.items():
+                    if document_id not in scoring_candidates:
+                        continue
                     contribution = self._score_term(
                         term_frequency=term_frequency,
                         document_length=field_lengths_by_document[document_id][field],

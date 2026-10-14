@@ -1,7 +1,8 @@
 from collections.abc import Generator
 from importlib import import_module
+import sqlite3
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -14,7 +15,20 @@ class Base(DeclarativeBase):
 def create_database_engine(database_url: str) -> Engine:
     """Create an engine, applying SQLite's thread setting when needed."""
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, connect_args=connect_args)
+    database_engine = create_engine(database_url, connect_args=connect_args)
+    if database_url.startswith("sqlite"):
+        event.listen(database_engine, "connect", _register_unicode_collation)
+    return database_engine
+
+
+def _register_unicode_collation(connection: sqlite3.Connection, _: object) -> None:
+    connection.create_collation("EDUSEARCH_UNICODE_NOCASE", _compare_casefold)
+
+
+def _compare_casefold(left: str, right: str) -> int:
+    folded_left = left.casefold()
+    folded_right = right.casefold()
+    return (folded_left > folded_right) - (folded_left < folded_right)
 
 
 engine = create_database_engine(settings.database_url)

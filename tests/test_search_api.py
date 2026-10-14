@@ -9,8 +9,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.v1.search import get_search_service
+from app.db.build_index import build_development_index
 from app.db.database import Base, create_database_engine, get_session, initialize_database
 from app.db.repositories.document_repository import DocumentRepository
+from app.db.seed import seed_sample_documents
 from app.indexing.indexer import DocumentIndexer
 from app.indexing.repository import IndexRepository
 from app.main import app
@@ -180,6 +182,369 @@ def test_search_supports_multiword_query_and_preserves_query(
         "machine",
         "learning",
     ]
+
+
+@pytest.mark.parametrize(
+    ("filter_name", "filter_value"),
+    [
+        ("education_level", " university "),
+        ("subject", "COMPUTER SCIENCE"),
+        ("subject", "MATEMÁTICAS"),
+        ("content_type", "COURSE"),
+        ("language", "EN"),
+        ("domain", "DOCS.PYTHON.ORG"),
+        ("difficulty", "BEGINNER"),
+    ],
+)
+def test_search_filters_match_supported_document_fields_case_insensitively(
+    client: TestClient,
+    session: Session,
+    filter_name: str,
+    filter_value: str,
+) -> None:
+    document = add_document(
+        session,
+        "https://docs.python.org/3/",
+        title="Python programming",
+        education_level="University",
+        subject=(
+            "Matemáticas"
+            if filter_name == "subject" and filter_value == "MATEMÁTICAS"
+            else "Computer Science"
+        ),
+        content_type="course",
+        language="en",
+        difficulty="beginner",
+    )
+    index_documents(session, document)
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "python", filter_name: filter_value},
+    )
+
+    assert response.status_code == 200
+    assert [result["document_id"] for result in response.json()["results"]] == [
+        document.id
+    ]
+
+
+def test_each_primary_filter_returns_only_documents_matching_its_field(
+    client: TestClient,
+    session: Session,
+) -> None:
+    documents = [
+        add_document(
+            session,
+            "https://filter-school-math.edu/",
+            title="python programming",
+            education_level="School",
+            subject="Mathematics",
+            content_type="article",
+        ),
+        add_document(
+            session,
+            "https://filter-professional-cs.edu/",
+            title="python programming",
+            education_level="Professional",
+            subject="Computer Science",
+            content_type="tutorial",
+        ),
+        add_document(
+            session,
+            "https://filter-school-cs.edu/",
+            title="python programming",
+            education_level="School",
+            subject="Computer Science",
+            content_type="tutorial",
+        ),
+    ]
+    index_documents(session, *documents)
+
+    expected_ids_by_filter = {
+        "education_level": {documents[0].id, documents[2].id},
+        "subject": {documents[0].id},
+        "content_type": {documents[1].id, documents[2].id},
+    }
+    filter_values = {
+        "education_level": "School",
+        "subject": "Mathematics",
+        "content_type": "tutorial",
+    }
+
+    for filter_name, filter_value in filter_values.items():
+        response = client.get(
+            "/api/v1/search",
+            params={"q": "python", filter_name: filter_value},
+        )
+
+        assert response.status_code == 200
+        result_ids = {result["document_id"] for result in response.json()["results"]}
+        assert result_ids == expected_ids_by_filter[filter_name]
+
+
+def test_search_combines_filters_and_preserves_bm25_order_and_scores(
+    client: TestClient,
+    session: Session,
+) -> None:
+    documents = [
+        add_document(
+            session,
+            "https://university.example.edu/python",
+            title="python python programming",
+            education_level="University",
+            subject="Computer Science",
+        ),
+        add_document(
+            session,
+            "https://professional.example.edu/python",
+            title="python programming",
+            education_level="Professional",
+            subject="Computer Science",
+        ),
+        add_document(
+            session,
+            "https://university-math.example.edu/python",
+            title="python programming",
+            education_level="University",
+            subject="Mathematics",
+        ),
+    ]
+    repository = index_documents(session, *documents)
+    baseline = BM25Ranker(repository).rank("python")
+
+    response = client.get(
+        "/api/v1/search",
+        params={
+            "q": "python",
+            "education_level": "university",
+            "subject": "computer science",
+        },
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    expected = [
+        ranked
+        for ranked in baseline
+        if ranked.document_id == documents[0].id
+    ]
+    assert [result["document_id"] for result in results] == [
+        ranked.document_id for ranked in expected
+    ]
+    assert [result["score"] for result in results] == pytest.approx(
+        [ranked.score for ranked in expected]
+    )
+    assert results[0]["matched_terms"] == ["python"]
+
+
+def test_search_filter_with_no_matches_returns_empty_results(
+    client: TestClient,
+    session: Session,
+) -> None:
+    document = add_document(
+        session,
+        "https://biology.example.edu/",
+        title="python basics",
+        subject="Programming",
+    )
+    index_documents(session, document)
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "python", "subject": "nonexistent subject"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"] == []
+    assert response.json()["total"] == 0
+
+
+def test_development_seed_has_searchable_valid_and_invalid_filter_combinations(
+    client: TestClient,
+    session: Session,
+) -> None:
+    seed_sample_documents(session)
+    build_development_index(session)
+
+    unfiltered = client.get(
+        "/api/v1/search",
+        params={"q": "Microsoft Learn"},
+    )
+    filtered = client.get(
+        "/api/v1/search",
+        params={
+            "q": "Microsoft Learn",
+            "education_level": "Professional",
+            "subject": "Computer Science",
+            "content_type": "Tutorial",
+        },
+    )
+    invalid_combination = client.get(
+        "/api/v1/search",
+        params={
+            "q": "algebra",
+            "education_level": "School",
+            "subject": "Mathematics",
+            "content_type": "Tutorial",
+        },
+    )
+
+    assert unfiltered.status_code == filtered.status_code == 200
+    assert {result["title"] for result in unfiltered.json()["results"]} >= {
+        "Microsoft Learn",
+        "Microsoft Learn Python Fundamentals Tutorial",
+    }
+    assert [
+        result["title"] for result in filtered.json()["results"]
+    ] == ["Microsoft Learn Python Fundamentals Tutorial"]
+    assert invalid_combination.json()["results"] == []
+    assert invalid_combination.json()["total"] == 0
+
+
+@pytest.mark.parametrize("filter_name", ["subject", "content_type"])
+def test_other_specialized_is_applied_as_a_real_filter(
+    client: TestClient,
+    session: Session,
+    filter_name: str,
+) -> None:
+    matching_document = add_document(
+        session,
+        f"https://other-specialized-{filter_name}.edu/",
+        title="python specialized resource",
+        **{filter_name: "Other / Specialized"},
+    )
+    other_document = add_document(
+        session,
+        f"https://ordinary-{filter_name}.edu/",
+        title="python ordinary resource",
+        **{filter_name: "Computer Science" if filter_name == "subject" else "course"},
+    )
+    index_documents(session, matching_document, other_document)
+
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "python", filter_name: "Other / Specialized"},
+    )
+
+    assert response.status_code == 200
+    assert [
+        result["document_id"] for result in response.json()["results"]
+    ] == [matching_document.id]
+
+
+def test_empty_search_filters_behave_like_unfiltered_search(
+    client: TestClient,
+    session: Session,
+) -> None:
+    document = add_document(
+        session,
+        "https://empty-filter.example.edu/",
+        title="python programming",
+    )
+    index_documents(session, document)
+
+    unfiltered = client.get("/api/v1/search", params={"q": "python"})
+    empty_filters = client.get(
+        "/api/v1/search",
+        params={"q": "python", "subject": " \t ", "domain": ""},
+    )
+
+    assert unfiltered.status_code == empty_filters.status_code == 200
+    assert empty_filters.json()["results"] == unfiltered.json()["results"]
+
+
+@pytest.mark.parametrize(
+    ("filter_name", "filter_value"),
+    [
+        ("subject", "bad\x00value"),
+        ("domain", "docs.python.org/path"),
+        ("domain", "not a hostname"),
+        ("education_level", "x" * 101),
+        ("subject", "x" * 201),
+        ("content_type", "x" * 101),
+        ("language", "x" * 36),
+        ("domain", "x" * 254),
+        ("difficulty", "x" * 51),
+    ],
+)
+def test_malformed_or_overlong_filter_values_are_rejected(
+    client: TestClient,
+    filter_name: str,
+    filter_value: str,
+) -> None:
+    response = client.get(
+        "/api/v1/search",
+        params={"q": "python", filter_name: filter_value},
+    )
+
+    assert response.status_code == 422
+
+
+def test_search_suggestions_use_indexed_titles_and_deduplicate(
+    client: TestClient,
+    session: Session,
+) -> None:
+    documents = [
+        add_document(session, "https://suggest-1.edu/", title="Python Programming"),
+        add_document(session, "https://suggest-2.edu/", title="Python Data Structures"),
+        add_document(session, "https://suggest-3.edu/", title="PYTHON PROGRAMMING"),
+        add_document(
+            session,
+            "https://suggest-body-only.edu/",
+            title="Unrelated resource",
+            body="Python programming appears in the body only.",
+        ),
+    ]
+    index_documents(session, *documents)
+
+    response = client.get(
+        "/api/v1/search/suggestions",
+        params={"q": "PyTh", "limit": 5},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["suggestions"] == [
+        "Python Data Structures",
+        "Python Programming",
+    ]
+
+
+def test_search_suggestions_respect_limits_and_short_queries(
+    client: TestClient,
+    session: Session,
+) -> None:
+    documents = [
+        add_document(session, f"https://suggest-limit-{number}.edu/", title=title)
+        for number, title in enumerate(
+            ("Python Basics", "Python Courses", "Python Exercises")
+        )
+    ]
+    index_documents(session, *documents)
+
+    limited = client.get(
+        "/api/v1/search/suggestions",
+        params={"q": "py", "limit": 1},
+    )
+    short = client.get("/api/v1/search/suggestions", params={"q": "p"})
+    empty = client.get("/api/v1/search/suggestions", params={"q": ""})
+    no_matches = client.get("/api/v1/search/suggestions", params={"q": "biology"})
+
+    assert limited.status_code == 200
+    assert len(limited.json()["suggestions"]) == 1
+    assert short.json()["suggestions"] == []
+    assert empty.json()["suggestions"] == []
+    assert no_matches.json()["suggestions"] == []
+
+
+@pytest.mark.parametrize("limit", [0, 11])
+def test_search_suggestion_limit_is_bounded(client: TestClient, limit: int) -> None:
+    response = client.get(
+        "/api/v1/search/suggestions",
+        params={"q": "python", "limit": limit},
+    )
+
+    assert response.status_code == 422
 
 
 def test_default_and_custom_limits_are_respected(
