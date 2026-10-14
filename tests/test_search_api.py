@@ -104,11 +104,58 @@ def test_search_endpoint_returns_bm25_ranked_search_results(
         "title",
         "url",
         "description",
+        "snippet",
         "score",
         "matched_terms",
     }
     assert "body" not in payload["results"][0]
     assert "Private full document body" not in response.text
+
+
+def test_search_response_includes_a_relevant_bounded_snippet(
+    client: TestClient,
+    session: Session,
+) -> None:
+    document = add_document(
+        session,
+        "https://snippet.edu/",
+        title="Astronomy",
+        description="An unrelated introduction.",
+        headings=["Observing the night sky"],
+        body="Astronomy studies stars, planets, and other objects in space. " * 8,
+    )
+    index_documents(session, document)
+
+    response = client.get("/api/v1/search", params={"q": "astronomy"})
+
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert "Astronomy" in result["snippet"]
+    assert len(result["snippet"]) <= 240
+    assert result["snippet"] != document.body
+    assert result["description"] == document.description
+    assert result["title"] == document.title
+    assert "body" not in result
+    assert result["score"] > 0
+    assert result["matched_terms"] == ["astronomy"]
+
+
+def test_search_snippet_keeps_script_like_content_as_json_text(
+    client: TestClient,
+    session: Session,
+) -> None:
+    document = add_document(
+        session,
+        "https://untrusted-snippet.edu/",
+        title="Markup",
+        body="<script>alert('unsafe')</script> lesson",
+    )
+    index_documents(session, document)
+
+    response = client.get("/api/v1/search", params={"q": "lesson"})
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["snippet"] == document.body
 
 
 def test_search_supports_multiword_query_and_preserves_query(

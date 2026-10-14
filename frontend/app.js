@@ -72,7 +72,7 @@ async function search(query) {
     }
 
     resultsTitle.textContent = `Results for “${query}”`;
-    renderResults(payload.results);
+    renderResults(payload.results, query);
     setStatus(`${payload.total} ${payload.total === 1 ? "result" : "results"} found.`);
   } catch {
     resultsTitle.textContent = "Search is temporarily unavailable";
@@ -103,6 +103,7 @@ function isValidSearchResponse(payload) {
         typeof result.url === "string" &&
         isWebUrl(result.url) &&
         (typeof result.description === "string" || result.description === null) &&
+        typeof result.snippet === "string" &&
         typeof result.score === "number" &&
         Number.isFinite(result.score) &&
         Array.isArray(result.matched_terms) &&
@@ -120,8 +121,9 @@ function isWebUrl(value) {
   }
 }
 
-function renderResults(results) {
+function renderResults(results, query) {
   const fragment = document.createDocumentFragment();
+  const queryTerms = getQueryTerms(query);
 
   for (const result of results) {
     const item = document.createElement("li");
@@ -141,17 +143,56 @@ function renderResults(results) {
 
     item.append(link, address);
 
-    if (result.description?.trim()) {
-      const description = document.createElement("p");
-      description.className = "result-description";
-      description.textContent = result.description.trim();
-      item.append(description);
+    if (result.snippet.trim()) {
+      const snippet = document.createElement("p");
+      snippet.className = "result-snippet";
+      appendHighlightedText(snippet, result.snippet, queryTerms);
+      item.append(snippet);
     }
 
     fragment.append(item);
   }
 
   resultsList.replaceChildren(fragment);
+}
+
+function getQueryTerms(query) {
+  const terms = query.match(/[\p{L}\p{N}\p{M}]+/gu) ?? [];
+  return new Set(terms.map(normalizeHighlightTerm));
+}
+
+function normalizeHighlightTerm(value) {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/ς/g, "σ");
+}
+
+function appendHighlightedText(container, text, queryTerms) {
+  const tokenPattern = /[\p{L}\p{N}\p{M}]+/gu;
+  const fragment = document.createDocumentFragment();
+  let previousEnd = 0;
+  let match;
+
+  while ((match = tokenPattern.exec(text)) !== null) {
+    if (match.index > previousEnd) {
+      fragment.append(document.createTextNode(text.slice(previousEnd, match.index)));
+    }
+    if (queryTerms.has(normalizeHighlightTerm(match[0]))) {
+      const mark = document.createElement("mark");
+      mark.textContent = match[0];
+      fragment.append(mark);
+    } else {
+      fragment.append(document.createTextNode(match[0]));
+    }
+    previousEnd = tokenPattern.lastIndex;
+  }
+
+  if (previousEnd < text.length) {
+    fragment.append(document.createTextNode(text.slice(previousEnd)));
+  }
+  container.replaceChildren(fragment);
 }
 
 function readableAddress(value) {

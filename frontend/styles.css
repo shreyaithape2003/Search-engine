@@ -284,12 +284,20 @@ h1 {
   white-space: nowrap;
 }
 
-.result-description {
+.result-snippet {
   margin: 8px 0 0;
   color: #5f5956;
   font-size: 14px;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+.result-snippet mark {
+  border-radius: 2px;
+  color: var(--ink);
+  background: #f3e4e2;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .loading-indicator {
