@@ -2,10 +2,16 @@ from sqlalchemy.orm import Session
 
 from app.db.repositories.document_repository import DocumentRepository
 from app.indexing.repository import IndexRepository
+from app.indexing.tokenizer import tokenize
 from app.models.document import Document
 from app.ranking.bm25 import BM25Ranker
 from app.ranking.models import RankedDocument
-from app.schemas.search import SearchResponse, SearchResult
+from app.schemas.search import (
+    SearchFilters,
+    SearchResponse,
+    SearchResult,
+    SearchSuggestionsResponse,
+)
 from app.services.snippet_generator import SnippetGenerator
 
 
@@ -21,8 +27,22 @@ class SearchService:
         self.document_repository = document_repository
         self.snippet_generator = SnippetGenerator()
 
-    def search(self, query: str, limit: int) -> SearchResponse:
-        ranked_documents = self.ranker.rank(query)[:limit]
+    def search(
+        self,
+        query: str,
+        limit: int,
+        filters: SearchFilters | None = None,
+    ) -> SearchResponse:
+        if filters is None:
+            ranked_documents = self.ranker.rank(query)[:limit]
+        else:
+            eligible_document_ids = self.document_repository.get_ids_matching_filters(
+                filters
+            )
+            ranked_documents = self.ranker.rank(
+                query,
+                eligible_document_ids=eligible_document_ids,
+            )[:limit]
         if not ranked_documents:
             return SearchResponse(query=query, results=[], total=0)
 
@@ -40,6 +60,26 @@ class SearchService:
             if ranked_document.document_id in documents_by_id
         ]
         return SearchResponse(query=query, results=results, total=len(results))
+
+    def suggest(self, query: str, limit: int) -> SearchSuggestionsResponse:
+        terms = tokenize(query)
+        if not terms or len(terms[-1]) < 2:
+            return SearchSuggestionsResponse(query=query, suggestions=[])
+
+        suggestions: list[str] = []
+        seen: set[str] = set()
+        for title in self.ranker.repository.get_title_suggestions(
+            terms[-1],
+            limit * 4,
+        ):
+            normalized = title.casefold()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            suggestions.append(title)
+            if len(suggestions) == limit:
+                break
+        return SearchSuggestionsResponse(query=query, suggestions=suggestions)
 
     def _to_result(
         self,
