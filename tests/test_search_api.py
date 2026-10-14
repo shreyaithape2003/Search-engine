@@ -9,8 +9,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.v1.search import get_search_service
+from app.db.build_index import build_development_index
 from app.db.database import Base, create_database_engine, get_session, initialize_database
 from app.db.repositories.document_repository import DocumentRepository
+from app.db.seed import seed_sample_documents
 from app.indexing.indexer import DocumentIndexer
 from app.indexing.repository import IndexRepository
 from app.main import app
@@ -227,6 +229,60 @@ def test_search_filters_match_supported_document_fields_case_insensitively(
     ]
 
 
+def test_each_primary_filter_returns_only_documents_matching_its_field(
+    client: TestClient,
+    session: Session,
+) -> None:
+    documents = [
+        add_document(
+            session,
+            "https://filter-school-math.edu/",
+            title="python programming",
+            education_level="School",
+            subject="Mathematics",
+            content_type="article",
+        ),
+        add_document(
+            session,
+            "https://filter-professional-cs.edu/",
+            title="python programming",
+            education_level="Professional",
+            subject="Computer Science",
+            content_type="tutorial",
+        ),
+        add_document(
+            session,
+            "https://filter-school-cs.edu/",
+            title="python programming",
+            education_level="School",
+            subject="Computer Science",
+            content_type="tutorial",
+        ),
+    ]
+    index_documents(session, *documents)
+
+    expected_ids_by_filter = {
+        "education_level": {documents[0].id, documents[2].id},
+        "subject": {documents[0].id},
+        "content_type": {documents[1].id, documents[2].id},
+    }
+    filter_values = {
+        "education_level": "School",
+        "subject": "Mathematics",
+        "content_type": "tutorial",
+    }
+
+    for filter_name, filter_value in filter_values.items():
+        response = client.get(
+            "/api/v1/search",
+            params={"q": "python", filter_name: filter_value},
+        )
+
+        assert response.status_code == 200
+        result_ids = {result["document_id"] for result in response.json()["results"]}
+        assert result_ids == expected_ids_by_filter[filter_name]
+
+
 def test_search_combines_filters_and_preserves_bm25_order_and_scores(
     client: TestClient,
     session: Session,
@@ -302,6 +358,48 @@ def test_search_filter_with_no_matches_returns_empty_results(
     assert response.status_code == 200
     assert response.json()["results"] == []
     assert response.json()["total"] == 0
+
+
+def test_development_seed_has_searchable_valid_and_invalid_filter_combinations(
+    client: TestClient,
+    session: Session,
+) -> None:
+    seed_sample_documents(session)
+    build_development_index(session)
+
+    unfiltered = client.get(
+        "/api/v1/search",
+        params={"q": "Microsoft Learn"},
+    )
+    filtered = client.get(
+        "/api/v1/search",
+        params={
+            "q": "Microsoft Learn",
+            "education_level": "Professional",
+            "subject": "Computer Science",
+            "content_type": "Tutorial",
+        },
+    )
+    invalid_combination = client.get(
+        "/api/v1/search",
+        params={
+            "q": "algebra",
+            "education_level": "School",
+            "subject": "Mathematics",
+            "content_type": "Tutorial",
+        },
+    )
+
+    assert unfiltered.status_code == filtered.status_code == 200
+    assert {result["title"] for result in unfiltered.json()["results"]} >= {
+        "Microsoft Learn",
+        "Microsoft Learn Python Fundamentals Tutorial",
+    }
+    assert [
+        result["title"] for result in filtered.json()["results"]
+    ] == ["Microsoft Learn Python Fundamentals Tutorial"]
+    assert invalid_combination.json()["results"] == []
+    assert invalid_combination.json()["total"] == 0
 
 
 @pytest.mark.parametrize("filter_name", ["subject", "content_type"])

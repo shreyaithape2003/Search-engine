@@ -116,11 +116,11 @@ The same configuration is used by the optional sample-data command:
 python -m app.db.seed
 ```
 
-This adds four deterministic development examples (university course,
-technical documentation, science education, and professional learning).
-Repeated runs skip existing sample URLs; the data is text and metadata only
-and does not require network access. The default `edusearch.db` file is ignored
-by Git.
+This adds 20 deterministic development examples across school, university,
+professional, and research education, including common subjects and resource
+types. Repeated runs skip existing sample URLs and preserve other documents;
+the data is text and metadata only and does not require network access. The
+default `edusearch.db` file is ignored by Git.
 
 ## Example development workflow
 
@@ -132,13 +132,23 @@ python -m app.db.build_index
 uvicorn app.main:app --reload
 ```
 
-The seed command creates development Documents. `build_index` rebuilds the
-SQLite inverted index from persisted Documents using the existing Phase 5
-indexer; it is safe to run repeatedly and reports when there are no Documents
-to index. This is an explicit development workflow, not a change to the
-crawler or ingestion pipeline. The database operations are not exposed as HTTP
-endpoints. `/health` continues to report application health. Serve the browser
-UI separately as described below.
+The seed command creates development/sample Documents only; it does not scrape
+or fetch the URLs. Its filterable samples include predictable combinations,
+such as School + Mathematics + Article, University + Computer Science +
+Documentation, and Professional + Computer Science + Tutorial. The original
+`Microsoft Learn` sample remains Professional + Technology + training, so it
+does not match the Computer Science + Tutorial filters. A separate
+`Microsoft Learn Python Fundamentals Tutorial` sample provides that
+demonstration without changing the original metadata.
+
+Run `python -m app.db.init_db`, then `python -m app.db.seed`, then
+`python -m app.db.build_index` after seeding. Seeding does not rebuild the
+inverted index. `build_index` reindexes persisted Documents using the existing
+Phase 5 indexer; it replaces each document's existing index rows, so repeated
+runs are safe and deterministic. This is an explicit development workflow,
+not a change to the crawler or ingestion pipeline. The database operations
+are not exposed as HTTP endpoints. `/health` continues to report application
+health. Serve the browser UI separately as described below.
 
 ## Open the UI
 
@@ -367,19 +377,16 @@ project, so these visual checks remain manual.
 ## Phase 10 search filters and autocomplete
 
 `GET /api/v1/search` accepts optional `education_level`, `subject`,
-`content_type`, `language`, `domain`, and `difficulty` filters. These map to
-existing `Document` fields; values are free-form because the stored
-classifications are sparse and are not backed by exhaustive enumerations.
+`content_type`, `language`, `domain`, and `difficulty` filters. The primary UI
+exposes Education level, Subject, and Resource type; dropdown values map to
+the existing `education_level`, `subject`, and `content_type` fields.
 Whitespace-only values are ignored. Non-empty values are trimmed, bounded by
 the corresponding stored field length, and compared without case sensitivity
-using Unicode case folding for SQLite. A well-formed value with no matches
-returns an empty result list; control characters and overlong values return
-HTTP 422.
-The current four seeded examples contain all six kinds of metadata, but their
-values are examples, not a complete classification catalog.
+using Unicode case folding for SQLite. Every selected filter must match (AND);
+a valid combination with no matches returns no results and is not broadened.
 
 ```text
-GET /api/v1/search?q=python&education_level=Professional&subject=Programming
+GET /api/v1/search?q=Microsoft%20Learn&education_level=Professional&subject=Computer%20Science&content_type=Tutorial
 GET /api/v1/search?q=python&domain=docs.python.org&language=en
 ```
 
@@ -404,8 +411,9 @@ The primary filter UI is a collapsible row of three dropdowns: **Education
 level**, **Subject**, and **Resource type**. Their predefined choices make
 available values clear; “Any…” means no filter. “College / University” is
 sent as the stored `University` value. “Other / Specialized” is sent as an
-actual filter value, not as a request to ignore that field. Stored metadata is
-sparse, so a choice only returns documents whose field matches that value.
+actual filter value, not as a request to ignore that field. The 20 seeded
+documents are examples rather than comprehensive classifications, so a
+choice only returns documents whose field matches that value.
 Domain, language, and difficulty remain supported by the API but are not shown
 as primary filters. **Clear filters** resets the dropdowns and refreshes the
 current query.

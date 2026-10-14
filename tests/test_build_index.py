@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import app.db.build_index as build_index_command
 from app.db.database import Base, create_database_engine, initialize_database
 from app.db.repositories.document_repository import DocumentRepository
+from app.db.seed import SAMPLE_DOCUMENTS, seed_sample_documents
 from app.indexing.indexer import DocumentIndexer
 from app.indexing.repository import IndexRepository
 from app.models.document import Document
@@ -75,6 +76,24 @@ def test_builds_index_for_all_existing_documents(
         posting.document_id
         for posting in IndexRepository(session).get_postings_for_term("python")
     } == {first.id, second.id}
+
+
+def test_seeded_documents_are_searchable_after_index_build(session: Session) -> None:
+    assert seed_sample_documents(session) == len(SAMPLE_DOCUMENTS)
+
+    indexed_count = build_index_command.build_development_index(session)
+    repository = IndexRepository(session)
+    python_titles = {
+        posting.document_id
+        for posting in repository.get_postings_for_term("python")
+    }
+    seeded_python_document = DocumentRepository(session).get_by_url(
+        "https://learn.microsoft.com/en-us/training/modules/python-fundamentals/"
+    )
+
+    assert indexed_count == len(SAMPLE_DOCUMENTS)
+    assert seeded_python_document is not None
+    assert seeded_python_document.id in python_titles
 
 
 def test_running_build_twice_replaces_postings_without_duplicates(
