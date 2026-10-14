@@ -17,7 +17,8 @@ field-aware tokenization, a SQLite inverted-index foundation, and
 term/document/field statistics. Phase 6 adds field-aware BM25 ranking. Phase 7
 exposes that ranking through a versioned FastAPI search endpoint. The frontend
 connects to the API in Phase 8 and displays real BM25-backed results. Phase 9
-adds concise query-relevant snippets and safe query-term highlighting.
+adds concise query-relevant snippets and safe query-term highlighting. Phase
+10 adds metadata filters and title-based autocomplete suggestions.
 Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
@@ -320,9 +321,8 @@ Example response:
 }
 ```
 
-`total` is the number of valid results returned for the requested limit. The
-endpoint does not provide autocomplete, filters, or educational ranking.
-Semantic/vector search and AI answers are also deferred.
+`total` is the number of valid results returned for the requested limit.
+Semantic/vector search and AI answers are not implemented.
 
 ## Phase 8 frontend integration
 
@@ -364,15 +364,83 @@ a query with mixed case and punctuation, such as `Python, programming!`.
 Frontend behavior has no dedicated automated browser test setup in this
 project, so these visual checks remain manual.
 
+## Phase 10 search filters and autocomplete
+
+`GET /api/v1/search` accepts optional `education_level`, `subject`,
+`content_type`, `language`, `domain`, and `difficulty` filters. These map to
+existing `Document` fields; values are free-form because the stored
+classifications are sparse and are not backed by exhaustive enumerations.
+Whitespace-only values are ignored. Non-empty values are trimmed, bounded by
+the corresponding stored field length, and compared without case sensitivity
+using Unicode case folding for SQLite. A well-formed value with no matches
+returns an empty result list; control characters and overlong values return
+HTTP 422.
+The current four seeded examples contain all six kinds of metadata, but their
+values are examples, not a complete classification catalog.
+
+```text
+GET /api/v1/search?q=python&education_level=Professional&subject=Programming
+GET /api/v1/search?q=python&domain=docs.python.org&language=en
+```
+
+Filtering first selects eligible document IDs in SQLite. BM25 still uses the
+same index postings and collection-wide statistics, then scores only eligible
+query candidates. Thus a document's score and relative order are unchanged by
+adding filters; an unfiltered request follows the original search path. Filter
+selection loads IDs, not document bodies, and final result documents continue
+to be fetched in bulk.
+
+Autocomplete is available at
+`GET /api/v1/search/suggestions?q=pyth&limit=5`. It returns a deterministic,
+case-insensitively deduplicated list of stored document titles whose indexed
+title term starts with the last query token. It requires at least two
+normalized characters in that token; shorter or punctuation-only input
+returns an empty list. The limit defaults to 6 and is restricted to 1–10.
+Suggestions reuse the existing term/document index and do not invoke BM25,
+scan document body text, or call an external service. Titles only become
+suggestions after their documents have been indexed.
+
+The frontend debounces suggestion requests, cancels or ignores stale requests,
+supports ArrowUp/ArrowDown, Enter, Escape, outside-click dismissal, and
+selection by click. Filters are compact optional text inputs in a collapsible
+row; **Clear filters** removes all active values and refreshes the current
+query. Search results retain the response's BM25 order, snippets, and query
+highlighting. API titles and suggestions are inserted as text, and filter
+values are sent as URL parameters rather than SQL.
+
+Filter predicates use SQLAlchemy-bound values, not constructed SQL strings.
+Filter and suggestion endpoints return only IDs or bounded titles/results;
+autocomplete is limited to 10 suggestions and does not expose document body
+text. Suggestions and search results are rendered with safe DOM text APIs.
+
+Manual browser checklist (no browser automation framework is configured):
+
+- Type at least two characters and verify suggestions appear after a short
+  pause; erase the input and verify they close.
+- Navigate suggestions with ArrowUp/ArrowDown; use Enter to select, Enter
+  without an active option to submit the current query, and Escape to close.
+- Click a suggestion and verify it searches; click outside and verify the
+  dropdown closes.
+- Open Filters, search with one filter, combine filters, clear them, and check
+  a combination with no results.
+- At a narrow/mobile viewport, verify the filter fields wrap, suggestions
+  remain within the search box width, and the page has no horizontal overflow.
+
+For local endpoint checks, run the API and frontend using the commands above,
+then visit `/health`, `/api/v1/search?q=python`, a filtered search such as
+`/api/v1/search?q=python&education_level=Professional`, and
+`/api/v1/search/suggestions?q=pyth`. Existing tests use isolated temporary
+SQLite databases and make no external network calls.
+
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
 - No sophisticated article extraction or educational content classification.
-- No vector search, semantic search, PageRank, autocomplete, filters, or
-  educational ranking.
+- No vector search, semantic search, PageRank, or educational ranking.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The frontend is served separately from the FastAPI application.
 
 ## Upcoming phases
 
-The next major phase is search quality improvements such as filters.
+Future phases may explore additional search-quality improvements. Semantic,
+vector, and AI-powered search remain out of scope.
