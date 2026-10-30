@@ -13,6 +13,10 @@ from app.db.repositories.seed_source_repository import (
     SeedSourceRepository,
 )
 from app.db.seed_sources import CURATED_SEED_SOURCES, seed_curated_sources
+from app.classification.taxonomy import (
+    normalize_education_level,
+    normalize_subject,
+)
 from app.schemas.seed_source import (
     SeedSourceCreate,
     SeedSourceRead,
@@ -192,3 +196,13 @@ def test_curated_source_seed_contains_12_sources_and_is_idempotent(
         "Microsoft Learn",
         "AWS Documentation",
     }
+
+    for source in CURATED_SEED_SOURCES:
+        assert all(
+            normalize_education_level(level) == level
+            for level in source.education_levels
+        )
+        assert all(
+            normalize_subject(subject) == subject
+            for subject in source.subjects
+        )

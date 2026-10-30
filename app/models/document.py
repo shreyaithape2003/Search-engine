@@ -85,6 +85,9 @@ class Document(Base):
     education_level: Mapped[str | None] = mapped_column(String(100), nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     difficulty: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    classification_provenance: Mapped[
+        dict[str, dict[str, object]] | None
+    ] = mapped_column(JSON, nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(),

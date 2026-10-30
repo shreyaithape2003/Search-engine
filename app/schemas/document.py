@@ -8,6 +8,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.classification.models import ClassificationEvidence
+
 
 class DocumentCreate(BaseModel):
     url: HttpUrl
@@ -26,6 +28,7 @@ class DocumentCreate(BaseModel):
     education_level: str | None = Field(default=None, max_length=100)
     content_type: str | None = Field(default=None, max_length=100)
     difficulty: str | None = Field(default=None, max_length=50)
+    classification_provenance: dict[str, ClassificationEvidence] | None = None
     content_hash: str | None = Field(default=None, max_length=128)
 
     model_config = ConfigDict(extra="forbid")
@@ -48,6 +51,7 @@ class DocumentUpdate(BaseModel):
     education_level: str | None = Field(default=None, max_length=100)
     content_type: str | None = Field(default=None, max_length=100)
     difficulty: str | None = Field(default=None, max_length=50)
+    classification_provenance: dict[str, ClassificationEvidence] | None = None
     content_hash: str | None = Field(default=None, max_length=128)
 
     model_config = ConfigDict(extra="forbid")
@@ -78,6 +82,7 @@ class DocumentRead(BaseModel):
     education_level: str | None
     content_type: str | None
     difficulty: str | None
+    classification_provenance: dict[str, ClassificationEvidence] | None
     content_hash: str | None
     created_at: AwareDatetime
     updated_at: AwareDatetime
