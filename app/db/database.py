@@ -2,7 +2,7 @@ from collections.abc import Generator
 from importlib import import_module
 import sqlite3
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -47,3 +47,15 @@ def initialize_database(database_engine: Engine = engine) -> None:
     import_module("app.models.seed_source")
     import_module("app.indexing.models")
     Base.metadata.create_all(bind=database_engine)
+    with database_engine.begin() as connection:
+        columns = {
+            column["name"]
+            for column in inspect(connection).get_columns("documents")
+        }
+        if "classification_provenance" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE documents "
+                    "ADD COLUMN classification_provenance JSON"
+                )
+            )

@@ -98,7 +98,13 @@ def test_ingestor_persists_extracted_content_and_source_metadata(
     assert document.source_type == "open_education"
     assert document.subject == "Computer Science"
     assert document.education_level == "University"
-    assert document.content_type == "webpage"
+    assert document.content_type is None
+    assert document.difficulty == "Unknown"
+    assert document.classification_provenance is not None
+    assert (
+        document.classification_provenance["subject"]["method"]
+        == "seed_source"
+    )
     assert document.published_at is not None
     assert document.source_updated_at is not None
     assert len(document.content_hash or "") == 64
@@ -213,16 +219,18 @@ def test_external_canonical_url_falls_back_and_malformed_html_ingests(
 
 
 def test_seed_source_metadata_is_not_arbitrarily_collapsed(session: Session) -> None:
-    source = SeedSourceRepository(session).create(
-        SeedSourceCreate(
-            name="Broad Source",
-            start_url="https://broad.example.edu/",
-            description="Broad educational materials.",
-            source_type="open_education",
-            education_levels=["School", "University"],
-            subjects=["Science", "Mathematics"],
-            allowed_url_prefixes=["https://broad.example.edu/"],
-        )
+    source = SeedSource(
+        id=2,
+        name="Broad Source",
+        start_url="https://broad.example.edu/",
+        domain="broad.example.edu",
+        description="Broad educational materials.",
+        source_type="open_education",
+        education_levels=["School", "University"],
+        subjects=["Science", "Mathematics"],
+        allowed_url_prefixes=["https://broad.example.edu/"],
+        active=True,
+        priority=10,
     )
 
     document = DocumentIngestor(DocumentRepository(session)).ingest(
@@ -233,6 +241,75 @@ def test_seed_source_metadata_is_not_arbitrarily_collapsed(session: Session) -> 
     assert document.source_type == "open_education"
     assert document.education_level is None
     assert document.subject is None
+
+
+def test_invalid_legacy_seed_metadata_does_not_break_ingestion(
+    session: Session,
+) -> None:
+    source = make_source(session)
+    source.education_levels = ["General"]
+    source.subjects = ["Science"]
+
+    document = DocumentIngestor(DocumentRepository(session)).ingest(
+        make_page(),
+        source,
+    )
+
+    assert document.education_level is None
+    assert document.subject is None
+    assert document.difficulty == "Unknown"
+
+
+def test_seed_source_aliases_are_normalized_before_ingestion(session: Session) -> None:
+    source = SeedSourceRepository(session).create(
+        SeedSourceCreate(
+            name="Canonicalized Source",
+            start_url="https://canonical.example/",
+            description="Metadata uses supported aliases.",
+            source_type="open_education",
+            education_levels=[" college "],
+            subjects=["CS"],
+            allowed_url_prefixes=["https://canonical.example/"],
+        )
+    )
+
+    document = DocumentIngestor(DocumentRepository(session)).ingest(
+        make_page(url="https://canonical.example/lesson"),
+        source,
+    )
+
+    assert source.education_levels == ["University"]
+    assert source.subjects == ["Computer Science"]
+    assert document.education_level == "University"
+    assert document.subject == "Computer Science"
+
+
+def test_ingestion_keeps_original_page_text_and_hash_with_classification(
+    session: Session,
+) -> None:
+    source = make_source(session)
+    html = (
+        "<title>Python Programming Tutorial</title>"
+        "<h1>Python tutorial</h1><p>Python code examples.</p>"
+    )
+
+    document = DocumentIngestor(DocumentRepository(session)).ingest(
+        make_page(html),
+        source,
+    )
+
+    assert document.title == "Python Programming Tutorial"
+    assert document.body == "Python tutorial\nPython code examples."
+    assert document.content_hash is not None
+    assert document.subject == "Computer Science"
+    assert document.content_type == "tutorial"
+    assert document.classification_provenance is not None
+    assert set(document.classification_provenance) == {
+        "education_level",
+        "subject",
+        "content_type",
+        "difficulty",
+    }
 
 
 def test_end_to_end_mock_crawler_to_document_repository(session: Session) -> None:

@@ -18,7 +18,9 @@ term/document/field statistics. Phase 6 adds field-aware BM25 ranking. Phase 7
 exposes that ranking through a versioned FastAPI search endpoint. The frontend
 connects to the API in Phase 8 and displays real BM25-backed results. Phase 9
 adds concise query-relevant snippets and safe query-term highlighting. Phase
-10 adds metadata filters and title-based autocomplete suggestions.
+10 adds metadata filters and title-based autocomplete suggestions. Phase 11A
+establishes a canonical educational taxonomy and deterministic, explainable
+classification during ingestion.
 Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
@@ -257,8 +259,10 @@ the result through the existing `DocumentRepository`. Canonical URLs are
 normalized and must remain within the SeedSource hostname and allowed URL
 prefixes; otherwise ingestion falls back to the fetched page URL. A stable
 SHA-256 hash is generated from normalized title, headings, and body content.
-SeedSource `source_type` is retained; subject and education level are only
-copied when the source metadata has a single unambiguous value.
+SeedSource `source_type` is retained; subject and education level are
+classified by the deterministic Phase 11A rules, using recognized document
+metadata first, then canonical SeedSource metadata, then bounded URL and page
+text signals. Original page content and content hashes are not changed.
 
 Repeated ingestion uses existing URL/canonical URL uniqueness rules and
 returns the existing document rather than creating a duplicate. `CrawlPage`
@@ -448,10 +452,46 @@ then visit `/health`, `/api/v1/search?q=python`, a filtered search such as
 `/api/v1/search/suggestions?q=pyth`. Existing tests use isolated temporary
 SQLite databases and make no external network calls.
 
+## Phase 11A educational classification foundations
+
+The shared taxonomy uses education levels **School**, **University**,
+**Professional**, and **Research**; subjects **Computer Science**,
+**Engineering**, **Mathematics**, **Physics**, **Chemistry**, **Biology**,
+**Medicine**, **Business / MBA**, **Economics**, **Humanities**, **Social
+Sciences**, and **Other / Specialized**; resource types `course`,
+`documentation`, `article`, `tutorial`, `research paper`, `lecture`, `blog`,
+`study material`, and `Other / Specialized`; and difficulty **Beginner**,
+**Intermediate**, **Advanced**, or **Unknown**. Exact, documented aliases
+such as `college` → `University` and `programming` → `Computer Science` are
+normalized without rewriting page text. Unknown or ambiguous values are not
+silently guessed.
+
+`EducationalClassifier` is deterministic and rule-based, not an AI/LLM
+classifier. For each field, recognized document metadata takes precedence,
+followed by a single unambiguous canonical SeedSource value and then bounded
+URL/title/description/heading/body rules. Difficulty is assigned only from
+explicit metadata or clear title/heading indicators; otherwise it is
+`Unknown`. Confidence (High/Medium/Low), method (`explicit_metadata`,
+`seed_source`, `rule_based`, or `unknown`), and concise reasons are retained
+per field in the document's optional `classification_provenance` JSON column.
+Database initialization safely adds that column to existing databases.
+
+The classifier runs locally between extraction and `DocumentCreate`; it makes
+no network calls and does not alter URLs, source metadata, extracted content,
+content hashes, indexing, ranking, or search filters. Current rules are
+intentionally conservative and cover the core taxonomy only. They are
+classification foundations, not corpus expansion: existing sample documents
+remain development data, and controlled collection of a larger real
+educational corpus is Phase 11B. Existing sample Documents and persisted
+legacy SeedSources are not bulk rewritten; new or updated SeedSource inputs
+are normalized/validated, and unsupported legacy values are ignored safely
+during classification.
+
 ## Current limitations and scope
 
 - No production crawler or distributed crawling.
-- No sophisticated article extraction or educational content classification.
+- Classification is a small, explainable rule set and may leave fields
+  unknown; it is not a comprehensive educational classifier.
 - No vector search, semantic search, PageRank, or educational ranking.
 - No embeddings, AI answers, LLM integration, authentication, or user accounts.
 - The frontend is served separately from the FastAPI application.

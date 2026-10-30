@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from pydantic import (
@@ -8,7 +9,13 @@ from pydantic import (
     HttpUrl,
     PositiveInt,
     StringConstraints,
+    field_validator,
     model_validator,
+)
+
+from app.classification.taxonomy import (
+    normalize_education_level,
+    normalize_subject,
 )
 
 NonEmptyString = Annotated[
@@ -17,6 +24,24 @@ NonEmptyString = Annotated[
 ]
 NonEmptyList = Annotated[list[NonEmptyString], Field(min_length=1)]
 URLPrefixList = Annotated[list[HttpUrl], Field(min_length=1)]
+
+
+def _normalize_categories(
+    values: list[str],
+    normalizer: Callable[[str | None], str | None],
+) -> list[str]:
+    normalized_values: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = normalizer(value)
+        if normalized is None:
+            raise ValueError(f"Unsupported taxonomy value: {value}")
+        category = normalized
+        key = category.casefold()
+        if key not in seen:
+            normalized_values.append(category)
+            seen.add(key)
+    return normalized_values
 
 
 class SeedSourceCreate(BaseModel):
@@ -32,6 +57,16 @@ class SeedSourceCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @field_validator("education_levels")
+    @classmethod
+    def canonicalize_education_levels(cls, values: list[str]) -> list[str]:
+        return _normalize_categories(values, normalize_education_level)
+
+    @field_validator("subjects")
+    @classmethod
+    def canonicalize_subjects(cls, values: list[str]) -> list[str]:
+        return _normalize_categories(values, normalize_subject)
+
 
 class SeedSourceUpdate(BaseModel):
     name: NonEmptyString | None = None
@@ -45,6 +80,26 @@ class SeedSourceUpdate(BaseModel):
     priority: PositiveInt | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("education_levels")
+    @classmethod
+    def canonicalize_education_levels(
+        cls,
+        values: list[str] | None,
+    ) -> list[str] | None:
+        if values is None:
+            return None
+        return _normalize_categories(values, normalize_education_level)
+
+    @field_validator("subjects")
+    @classmethod
+    def canonicalize_subjects(
+        cls,
+        values: list[str] | None,
+    ) -> list[str] | None:
+        if values is None:
+            return None
+        return _normalize_categories(values, normalize_subject)
 
     @model_validator(mode="after")
     def reject_explicit_null_values(self) -> "SeedSourceUpdate":

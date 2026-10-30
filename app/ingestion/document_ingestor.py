@@ -1,3 +1,5 @@
+from app.classification.classifier import EducationalClassifier
+from app.classification.models import ClassificationInput
 from app.crawler.models import CrawlPage
 from app.crawler.url_utils import normalize_url
 from app.db.repositories.document_repository import (
@@ -10,6 +12,12 @@ from app.models.seed_source import SeedSource
 from app.schemas.document import DocumentCreate
 
 
+def _source_categories(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [value for value in values[:100] if isinstance(value, str)]
+
+
 class DocumentIngestor:
     """Extract crawled HTML and persist it through DocumentRepository."""
 
@@ -17,13 +25,34 @@ class DocumentIngestor:
         self,
         repository: DocumentRepository,
         extractor: HTMLContentExtractor | None = None,
+        classifier: EducationalClassifier | None = None,
     ) -> None:
         self.repository = repository
         self.extractor = extractor or HTMLContentExtractor()
+        self.classifier = classifier or EducationalClassifier()
 
     def ingest(self, page: CrawlPage, source: SeedSource) -> Document:
         """Convert one crawler page to a Document, idempotently by its URLs."""
         extracted = self.extractor.extract(page, source)
+        classification = self.classifier.classify(
+            ClassificationInput(
+                url=str(page.url),
+                title=extracted.title,
+                description=(
+                    extracted.description[:5000]
+                    if extracted.description is not None
+                    else None
+                ),
+                headings=extracted.headings[:100],
+                body=extracted.body,
+                document_subject=None,
+                document_education_level=None,
+                document_content_type=extracted.content_type,
+                seed_source_type=source.source_type,
+                seed_subjects=_source_categories(source.subjects),
+                seed_education_levels=_source_categories(source.education_levels),
+            )
+        )
         document_data = DocumentCreate(
             url=normalize_url(str(page.url)),
             canonical_url=str(extracted.canonical_url),
@@ -37,13 +66,14 @@ class DocumentIngestor:
             published_at=extracted.published_at,
             source_updated_at=extracted.source_updated_at,
             source_type=source.source_type,
-            subject=source.subjects[0] if len(source.subjects) == 1 else None,
-            education_level=(
-                source.education_levels[0]
-                if len(source.education_levels) == 1
-                else None
-            ),
-            content_type=extracted.content_type,
+            subject=classification.subject,
+            education_level=classification.education_level,
+            content_type=classification.content_type,
+            difficulty=classification.difficulty,
+            classification_provenance={
+                field: evidence.model_dump()
+                for field, evidence in classification.provenance.items()
+            },
             content_hash=extracted.content_hash,
         )
 

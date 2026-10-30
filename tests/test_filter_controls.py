@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from app.classification.taxonomy import EDUCATION_LEVELS, RESOURCE_TYPES, SUBJECTS
+
 
 class FilterControlParser(HTMLParser):
     def __init__(self) -> None:
@@ -134,3 +136,22 @@ def test_any_options_are_blank_and_other_is_a_filter_value(
             option for option in options if option["label"] == "Other / Specialized"
         )
         assert other_option["value"] == "Other / Specialized"
+
+
+def test_filter_values_are_the_shared_taxonomy() -> None:
+    frontend = Path(__file__).resolve().parents[1] / "frontend" / "index.html"
+    parser = FilterControlParser()
+    parser.feed(frontend.read_text(encoding="utf-8"))
+
+    def values(control_id: str) -> tuple[str, ...]:
+        options = parser.controls[control_id]["options"]
+        assert isinstance(options, list)
+        return tuple(
+            option["value"]
+            for option in options
+            if option["value"]
+        )
+
+    assert values("filter-education-level") == EDUCATION_LEVELS
+    assert values("filter-subject") == SUBJECTS
+    assert values("filter-content-type") == RESOURCE_TYPES
