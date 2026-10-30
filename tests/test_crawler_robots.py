@@ -144,3 +144,39 @@ def test_robots_can_be_disabled_explicitly() -> None:
         assert requests == ["/3/"]
 
     asyncio.run(run())
+
+
+def test_robots_crawl_delay_is_enforced_for_page_requests() -> None:
+    sleep_intervals: list[float] = []
+
+    async def record_sleep(delay: float) -> None:
+        sleep_intervals.append(delay)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(
+                200,
+                text="User-agent: *\nCrawl-delay: 3\n",
+            )
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            text='<a href="/3/tutorial/">Tutorial</a>',
+        )
+
+    async def run() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await Crawler(
+                CrawlerConfig(
+                    max_pages=2,
+                    max_depth=1,
+                    request_delay=0,
+                ),
+                client=client,
+                sleep=record_sleep,
+            ).crawl(make_source())
+
+        assert result.pages_fetched == 2
+
+    asyncio.run(run())
+    assert sleep_intervals == [3, 3]

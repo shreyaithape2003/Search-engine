@@ -7,6 +7,7 @@ import httpx
 from app.crawler.config import CrawlerConfig
 
 BeforeRequest = Callable[[], Awaitable[None]]
+DelayUpdate = Callable[[float], None]
 
 
 class RobotsChecker:
@@ -17,10 +18,12 @@ class RobotsChecker:
         client: httpx.AsyncClient,
         config: CrawlerConfig,
         before_request: BeforeRequest,
+        delay_update: DelayUpdate,
     ) -> None:
         self.client = client
         self.config = config
         self.before_request = before_request
+        self.delay_update = delay_update
         self._rules: dict[str, RobotFileParser | None] = {}
 
     async def can_fetch(self, url: str) -> tuple[bool, str | None]:
@@ -73,6 +76,13 @@ class RobotsChecker:
         parser.set_url(robots_url)
         parser.parse(bytes(body).decode("utf-8", errors="replace").splitlines())
         self._rules[origin] = parser
+        crawl_delay = parser.crawl_delay(self.config.user_agent)
+        request_rate = parser.request_rate(self.config.user_agent)
+        if request_rate is not None and request_rate.requests > 0:
+            rate_delay = request_rate.seconds / request_rate.requests
+            crawl_delay = max(crawl_delay or 0, rate_delay)
+        if crawl_delay is not None:
+            self.delay_update(float(crawl_delay))
 
     @staticmethod
     def _origin(url: str) -> str:
