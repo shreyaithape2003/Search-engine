@@ -277,6 +277,16 @@ class EducationalClassifier:
             evidence,
         )
         if rule_level is not None:
+            if (
+                source_levels_are_canonical
+                and len(source_levels) > 1
+                and rule_level not in source_levels
+            ):
+                return None, _evidence(
+                    "unknown",
+                    "Low",
+                    "rule-based education level conflicts with curated seed levels",
+                )
             if rule_confidence == "Medium" and rule_level in source_levels:
                 rule_confidence = "High"
                 rule_reasons = (*rule_reasons, "seed source supports the same level")

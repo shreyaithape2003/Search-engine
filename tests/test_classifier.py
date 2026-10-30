@@ -193,19 +193,19 @@ def test_explicit_metadata_precedes_seed_and_page_rules(
 ) -> None:
     result = classify(
         classifier,
-        url="https://learn.example/research/papers/",
-        title="Advanced Engineering Research Paper",
+        url="https://example.edu/school/mathematics/",
+        title="Grade 7 Mathematics",
         document_education_level=" college ",
         document_subject="math",
-        document_content_type="Research Paper",
+        document_content_type="article",
         document_difficulty="intermediate",
-        seed_education_levels=["School"],
+        seed_education_levels=["University", "Professional"],
         seed_subjects=["Engineering"],
     )
 
     assert result.education_level == "University"
     assert result.subject == "Mathematics"
-    assert result.content_type == "research paper"
+    assert result.content_type == "article"
     assert result.difficulty == "Intermediate"
     assert all(
         evidence.method == "explicit_metadata"
@@ -230,6 +230,57 @@ def test_seed_source_metadata_fills_missing_fields_when_unambiguous(
     assert result.content_type == "documentation"
     assert result.provenance["education_level"].method == "seed_source"
     assert result.provenance["subject"].method == "seed_source"
+
+
+def test_multiple_seed_levels_allow_matching_rule_based_level(
+    classifier: EducationalClassifier,
+) -> None:
+    result = classify(
+        classifier,
+        url="https://example.edu/school/mathematics/",
+        title="Grade 7 Mathematics",
+        seed_education_levels=["University", "School"],
+    )
+
+    assert result.education_level == "School"
+    assert result.provenance["education_level"].method == "rule_based"
+    assert result.provenance["education_level"].confidence == "High"
+
+
+def test_multiple_seed_levels_reject_conflicting_rule_based_level(
+    classifier: EducationalClassifier,
+) -> None:
+    result = classify(
+        classifier,
+        url="https://example.edu/school/mathematics/",
+        title="Grade 7 Mathematics",
+        seed_education_levels=["University", "Professional"],
+    )
+
+    evidence = result.provenance["education_level"]
+    assert result.education_level is None
+    assert evidence.method == "unknown"
+    assert evidence.confidence == "Low"
+    assert "conflicts" in evidence.reasons[0]
+
+
+@pytest.mark.parametrize(
+    "seed_education_levels",
+    [[], ["General"]],
+)
+def test_missing_or_unsupported_seed_levels_keep_rule_behavior(
+    classifier: EducationalClassifier,
+    seed_education_levels: list[str],
+) -> None:
+    result = classify(
+        classifier,
+        url="https://example.edu/school/mathematics/",
+        title="Grade 7 Mathematics",
+        seed_education_levels=seed_education_levels,
+    )
+
+    assert result.education_level == "School"
+    assert result.provenance["education_level"].method == "rule_based"
 
 
 def test_ambiguous_seed_metadata_is_not_collapsed_or_guessed(
