@@ -20,7 +20,8 @@ connects to the API in Phase 8 and displays real BM25-backed results. Phase 9
 adds concise query-relevant snippets and safe query-term highlighting. Phase
 10 adds metadata filters and title-based autocomplete suggestions. Phase 11A
 establishes a canonical educational taxonomy and deterministic, explainable
-classification during ingestion.
+classification during ingestion. Phase 11B adds a controlled, explicit corpus
+collector built on the existing crawler and ingestion pipeline.
 Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
@@ -203,7 +204,7 @@ Initialize both Phase 2 and Phase 3 tables with the existing command:
 python -m app.db.init_db
 ```
 
-Insert the 12 deterministic curated sources with:
+Insert the 18 deterministic curated sources with:
 
 ```powershell
 python -m app.db.seed_sources
@@ -213,8 +214,8 @@ The seed command performs no network requests. It skips start URLs already in
 the database, so a repeat run reports zero additional source records.
 
 Phase 3 prepared the persistent source registry but did not crawl, download,
-or parse websites. The development crawler described below is the first
-crawling functionality and uses this registry as its configuration.
+or parse websites. The development crawler and Phase 11B collector use this
+registry as their configuration.
 
 ## Phase 4A development crawler
 
@@ -486,6 +487,87 @@ educational corpus is Phase 11B. Existing sample Documents and persisted
 legacy SeedSources are not bulk rewritten; new or updated SeedSource inputs
 are normalized/validated, and unsupported legacy values are ignored safely
 during classification.
+
+## Phase 11B controlled corpus collection
+
+The source registry now contains 20 curated sources. Eight sources were added:
+Open Textbook Library, LibreTexts Chemistry, LibreTexts Biology, LibreTexts
+Mathematics, Open Yale Courses, Django Documentation, NumPy Documentation,
+and The Rust Programming Language. The registry also retains the original 12
+sources. Registry seeding is metadata only; it does not fetch or create
+Documents.
+
+The added sources were reviewed against their currently published robots
+policies before being activated. Open Textbook Library allows crawling for
+`User-agent: *` and specifies a 120-second crawl delay; all three LibreTexts
+sources specify a 5-second delay and disallow operational paths; Open Yale
+Courses disallows administrative and implementation paths, not its course
+paths; Django's policy disallows some localized pages, not its English
+documentation paths; Rust's policy disallows older book versions, not the
+configured stable book path. NumPy's robots file contains content-signal
+definitions but no explicit search yes/no signal or path rules. A robots
+policy is not a general permission grant; sites can change policies, and the
+collector checks robots rules again during each run. Sources with inaccessible
+robots files or unverified crawl restrictions were not added in this source
+expansion. In the candidate checks, CK-12 returned HTTP 403 for robots.txt,
+Stanford Engineering Everywhere returned HTTP 404, and the R Project robots
+request failed at the transport/DNS layer; these candidates were not added.
+The existing OpenLearn registry entry was not treated as verified eligible
+because its robots.txt request returned HTTP 403. A denied or unavailable
+robots file is conservatively treated as a skip.
+
+Collection is never started by application startup. From the repository root,
+initialize the database and seed the source registry, then preview a run:
+
+```powershell
+python -m app.db.init_db
+python -m app.db.seed_sources
+python -m app.db.collect_corpus --source "Python Documentation" --max-pages 5 --max-depth 1
+```
+
+The collector defaults to a dry run: it lists selected active sources and
+limits without making network requests or changing Documents. Use `--execute`
+to explicitly crawl and persist pages. A live run must name at least one
+source with `--source`; repeat the option to select multiple exact source
+names. `--all-sources` is required to explicitly collect from every active
+source. Omitting both options previews all active sources without crawling.
+Limits apply per source; the page limit is 1–100 and link depth is 0–5. The
+default request delay is one second, and any larger delay declared by
+robots.txt is enforced.
+
+The crawler remains sequential and respects its exact-domain/prefix checks,
+robots rules, timeout, response-size limit, manual scoped redirects, and HTML
+content-type restriction. Pages without a title, obvious error/access-gate
+pages, pages with less than 100 characters of body text, and pages with less
+than 160 characters of combined descriptive, heading, and body text are
+skipped.
+
+For example, execute a controlled collection and then rebuild the existing
+search index:
+
+```powershell
+python -m app.db.collect_corpus --source "Python Documentation" --max-pages 5 --max-depth 1 --execute
+python -m app.db.build_index
+```
+
+Collection reports attempted URLs, fetched and accepted pages, skipped pages,
+failures, newly created Documents, and URL/canonical-URL duplicates. A
+successful page is extracted locally and passed through the existing
+DocumentIngestor and Phase 11A classifier. Duplicate URLs are returned as
+existing documents rather than inserted again. Document writes are committed
+per page, so an individual failed page does not roll back previously stored
+pages; the index is updated only by the explicit existing index-build command.
+That command replaces each document's postings and statistics, so repeating
+it does not duplicate index rows.
+
+The repository's deterministic records created by `python -m app.db.seed` are
+development/sample Documents, not crawled content. Real collection creates
+Documents from fetched page HTML, canonical URLs, and extracted metadata. The
+collector does not fabricate records or mark sample data as real. No live
+collection has been run as part of this phase implementation, so there are no
+real-crawl counts to report. Access, robots rules, page quality, and available
+content vary by source; the long-term source/document targets are not claimed
+as achieved.
 
 ## Current limitations and scope
 

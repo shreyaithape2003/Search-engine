@@ -23,6 +23,9 @@ class _RequestGate:
         self.sleep = sleep
         self.last_request_at: float | None = None
 
+    def require_delay(self, delay: float) -> None:
+        self.delay = max(self.delay, delay)
+
     async def wait(self) -> None:
         now = time.monotonic()
         if self.last_request_at is not None:
@@ -71,7 +74,12 @@ class Crawler:
         gate = _RequestGate(self.config.request_delay, self.sleep)
         fetcher = HTTPFetcher(client, self.config, gate.wait)
         robots = (
-            RobotsChecker(client, self.config, gate.wait)
+            RobotsChecker(
+                client,
+                self.config,
+                gate.wait,
+                gate.require_delay,
+            )
             if self.config.respect_robots_txt
             else None
         )

@@ -7,6 +7,7 @@ from app.db.repositories.document_repository import (
     DuplicateDocumentError,
 )
 from app.ingestion.html_extractor import HTMLContentExtractor
+from app.ingestion.models import ExtractedDocument
 from app.models.document import Document
 from app.models.seed_source import SeedSource
 from app.schemas.document import DocumentCreate
@@ -34,6 +35,24 @@ class DocumentIngestor:
     def ingest(self, page: CrawlPage, source: SeedSource) -> Document:
         """Convert one crawler page to a Document, idempotently by its URLs."""
         extracted = self.extractor.extract(page, source)
+        return self.ingest_extracted(page, source, extracted)
+
+    def ingest_extracted(
+        self,
+        page: CrawlPage,
+        source: SeedSource,
+        extracted: ExtractedDocument,
+    ) -> Document:
+        """Persist content already extracted and quality-checked by a collector."""
+        return self.ingest_extracted_with_status(page, source, extracted)[0]
+
+    def ingest_extracted_with_status(
+        self,
+        page: CrawlPage,
+        source: SeedSource,
+        extracted: ExtractedDocument,
+    ) -> tuple[Document, bool]:
+        """Return the document and whether this call created it."""
         classification = self.classifier.classify(
             ClassificationInput(
                 url=str(page.url),
@@ -79,14 +98,14 @@ class DocumentIngestor:
 
         existing = self._find_existing_document(document_data)
         if existing is not None:
-            return existing
+            return existing, False
 
         try:
-            return self.repository.create(document_data)
+            return self.repository.create(document_data), True
         except DuplicateDocumentError:
             existing = self._find_existing_document(document_data)
             if existing is not None:
-                return existing
+                return existing, False
             raise
 
     def _find_existing_document(

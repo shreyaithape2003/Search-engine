@@ -173,15 +173,15 @@ def test_duplicate_start_url_is_rejected_and_session_recovers(session: Session) 
     assert repository.create(make_source("https://another.example.edu/")).id is not None
 
 
-def test_curated_source_seed_contains_12_sources_and_is_idempotent(
+def test_curated_source_seed_contains_20_sources_and_is_idempotent(
     session: Session,
 ) -> None:
-    assert len(CURATED_SEED_SOURCES) == 12
-    assert seed_curated_sources(session) == 12
+    assert len(CURATED_SEED_SOURCES) == 20
+    assert seed_curated_sources(session) == 20
     assert seed_curated_sources(session) == 0
 
-    sources = SeedSourceRepository(session).list(limit=20)
-    assert len(sources) == 12
+    sources = SeedSourceRepository(session).list(limit=30)
+    assert len(sources) == 20
     assert {source.name for source in sources} == {
         "MIT OpenCourseWare",
         "OpenLearn",
@@ -195,6 +195,14 @@ def test_curated_source_seed_contains_12_sources_and_is_idempotent(
         "MDN Web Docs",
         "Microsoft Learn",
         "AWS Documentation",
+        "Open Textbook Library",
+        "LibreTexts Chemistry",
+        "LibreTexts Biology",
+        "LibreTexts Mathematics",
+        "Open Yale Courses",
+        "Django Documentation",
+        "NumPy Documentation",
+        "The Rust Programming Language",
     }
 
     for source in CURATED_SEED_SOURCES:
