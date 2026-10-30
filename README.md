@@ -21,7 +21,8 @@ adds concise query-relevant snippets and safe query-term highlighting. Phase
 10 adds metadata filters and title-based autocomplete suggestions. Phase 11A
 establishes a canonical educational taxonomy and deterministic, explainable
 classification during ingestion. Phase 11B adds a controlled, explicit corpus
-collector built on the existing crawler and ingestion pipeline.
+collector built on the existing crawler and ingestion pipeline. Phase 12 adds
+an offline search-quality benchmark for the existing BM25 pipeline.
 Semantic/vector search and AI search are not implemented.
 
 ## Technology stack
@@ -568,6 +569,58 @@ collection has been run as part of this phase implementation, so there are no
 real-crawl counts to report. Access, robots rules, page quality, and available
 content vary by source; the long-term source/document targets are not claimed
 as achieved.
+
+## Phase 12 offline search-quality evaluation
+
+Search evaluation makes ranking quality measurable and gives future ranking
+changes a fixed benchmark to compare against. This phase measures the existing
+production search pipeline; it does not change BM25, tokenization, filters, the
+search API contract, or the frontend.
+
+Run the evaluation from the repository root:
+
+```powershell
+python -m app.evaluation.run
+```
+
+The runner validates a manually curated dataset of 24 educational queries and
+48 graded judgments over 20 documents from the deterministic development
+sample corpus. It uses stable fixture keys mapped to the samples' stable URLs,
+not database row IDs. The examples cover all four education levels, multiple
+subjects and resource types, exact and partial title searches, topic and
+documentation searches, mixed-case and punctuation, multi-term searches,
+filters, and queries with no grade-2-or-better judgments. These are sample
+documents, not real crawled web pages. The query set and labels are stored in
+`app/evaluation/dataset.py`, separately from production seed definitions.
+
+Each judgment grade is **0** (irrelevant), **1** (weakly relevant), **2**
+(relevant), or **3** (highly relevant). Precision, Recall, and MRR use binary
+relevance (`grade >= 2`). Precision@K divides by K even when fewer than K
+results are retrieved. Recall@K divides by the total known relevant judgments;
+queries with no grade-2-or-better judgments have undefined (`n/a`) Recall and
+are excluded from mean Recall. MRR is zero when no relevant result is
+retrieved and includes all queries in its mean. NDCG uses graded gain
+`2^grade - 1` with `log2(rank + 1)` discount; queries with no positive ideal
+gain have undefined NDCG and are excluded from mean NDCG. Mean Precision and
+MRR include no-relevant queries, which remain visible in per-query output and
+score zero for these binary metrics.
+
+The runner creates a fresh SQLite file in a managed temporary directory,
+initializes the existing schema, inserts only the fixed sample fixtures,
+builds the existing inverted index, and invokes `SearchService.search()` with
+the benchmark query and filters. Search results are mapped back to stable
+fixture keys in the actual BM25 order. It never uses the configured local
+database, starts a server, performs network requests, or persists judgments
+to production tables; the temporary database is disposed and removed after
+the run.
+
+The report includes dataset counts, mean Precision@5/10, Recall@5/10, MRR,
+NDCG@5/10, and per-query results. The benchmark is intentionally small and
+manually judged, based on the development sample corpus, and cannot establish
+universal search quality. As the real educational corpus grows, expand the
+query set and judgments using reviewed human relevance assessments. Scores
+are comparative evidence for this fixed benchmark, not a guarantee of
+real-world quality.
 
 ## Current limitations and scope
 
