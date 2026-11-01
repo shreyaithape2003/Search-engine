@@ -79,14 +79,14 @@ EVALUATION_QUERIES = (
         "q03",
         "organic chemistry reaction mechanisms",
         "Learn common organic chemistry reactions.",
-        _judgments(("organic_chemistry", 3), ("human_anatomy", 0)),
+        _judgments(("organic_chemistry", 3)),
         SearchFilters(subject="Chemistry"),
     ),
     EvaluationQuery(
         "q04",
         "linear equations and variables",
         "Find school-level algebra instruction.",
-        _judgments(("school_algebra", 3), ("microeconomics", 0)),
+        _judgments(("school_algebra", 3)),
         SearchFilters(education_level="School", subject="Mathematics"),
     ),
     EvaluationQuery(
@@ -107,7 +107,7 @@ EVALUATION_QUERIES = (
         "q07",
         "engineering design prototyping",
         "Learn university engineering design methods.",
-        _judgments(("engineering_design", 3), ("classical_mechanics", 1)),
+        _judgments(("engineering_design", 3)),
         SearchFilters(education_level="University", subject="Engineering"),
     ),
     EvaluationQuery(
@@ -121,7 +121,7 @@ EVALUATION_QUERIES = (
         "q09",
         "cell biology cellular membranes",
         "Find research-level cell biology material.",
-        _judgments(("cell_biology_research", 3), ("specialized_research", 0)),
+        _judgments(("cell_biology_research", 3)),
         SearchFilters(education_level="Research", subject="Biology"),
     ),
     EvaluationQuery(
@@ -135,7 +135,7 @@ EVALUATION_QUERIES = (
         "q11",
         "historical primary sources context",
         "Learn to interpret historical evidence.",
-        _judgments(("world_history", 3), ("school_ecology", 0)),
+        _judgments(("world_history", 3)),
         SearchFilters(subject="Humanities"),
     ),
     EvaluationQuery(
@@ -166,7 +166,7 @@ EVALUATION_QUERIES = (
         "q16",
         "bonding functional groups reactions",
         "Study foundational chemistry reactions.",
-        _judgments(("organic_chemistry", 3), ("human_anatomy", 0)),
+        _judgments(("organic_chemistry", 3)),
         SearchFilters(subject="Chemistry", content_type="tutorial"),
     ),
     EvaluationQuery(
@@ -190,14 +190,14 @@ EVALUATION_QUERIES = (
         "q19",
         "supply demand markets incentives",
         "Understand how supply and demand shape markets.",
-        _judgments(("microeconomics", 3), ("business_management", 1)),
+        _judgments(("microeconomics", 3)),
         SearchFilters(subject="Economics"),
     ),
     EvaluationQuery(
         "q20",
         "research questions evidence surveys",
         "Learn about social science research methods.",
-        _judgments(("social_science_research", 3), ("cell_biology_research", 1)),
+        _judgments(("social_science_research", 3)),
         SearchFilters(
             education_level="Professional",
             content_type="blog",
@@ -219,7 +219,7 @@ EVALUATION_QUERIES = (
         "q23",
         "business strategy decision making",
         "Learn business management and strategy.",
-        _judgments(("business_management", 3), ("microeconomics", 1)),
+        _judgments(("business_management", 3)),
         SearchFilters(subject="Business / MBA"),
     ),
     EvaluationQuery(
@@ -296,6 +296,26 @@ def validate_dataset(
                         f"{field} filter {value!r}."
                     )
 
+            for judgment in query.judgments:
+                document = documents[judgment.document_key]
+                for field, expected in query.filters.model_dump(
+                    exclude_none=True
+                ).items():
+                    actual = (
+                        document.url.host
+                        if field == "domain"
+                        else getattr(document, field)
+                    )
+                    if (
+                        not isinstance(actual, str)
+                        or actual.casefold() != expected.casefold()
+                    ):
+                        raise ValueError(
+                            f"Query {query.query_id!r} has judged fixture "
+                            f"document {judgment.document_key!r} that does not "
+                            f"satisfy its {field} filter {expected!r}."
+                        )
+
             level = query.filters.education_level
             if level is not None and any(
                 documents[key].education_level == level for key in relevant_keys
@@ -319,4 +339,3 @@ def validate_dataset(
 def relevance_by_key(query: EvaluationQuery) -> dict[str, int]:
     """Return one query's validated stable-key relevance labels."""
     return {judgment.document_key: judgment.grade for judgment in query.judgments}
-

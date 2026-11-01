@@ -106,11 +106,11 @@ def test_metrics_reject_nonpositive_or_noninteger_cutoffs() -> None:
         recall_at_k([], {}, True)
 
 
-def test_benchmark_dataset_has_24_queries_and_48_judgments() -> None:
+def test_benchmark_dataset_has_24_queries_and_39_judgments() -> None:
     validate_dataset()
 
     assert len(EVALUATION_QUERIES) == 24
-    assert sum(len(query.judgments) for query in EVALUATION_QUERIES) == 48
+    assert sum(len(query.judgments) for query in EVALUATION_QUERIES) == 39
     assert len(FIXTURE_DOCUMENTS) == 20
     assert any(not any(j.grade >= 2 for j in q.judgments) for q in EVALUATION_QUERIES)
 
@@ -183,6 +183,35 @@ def test_dataset_validation_rejects_missing_education_level_coverage() -> None:
     ]
 
     with pytest.raises(ValueError, match="Research"):
+        validate_dataset(queries)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("education_level", "Professional"),
+        ("subject", "Physics"),
+        ("content_type", "tutorial"),
+        ("difficulty", "Beginner"),
+        ("language", "fr"),
+        ("domain", "physics.example.edu"),
+    ],
+)
+def test_dataset_validation_rejects_judgments_outside_filter_candidate_set(
+    field: str,
+    value: str,
+) -> None:
+    queries = [
+        replace(
+            query,
+            filters=query.filters.model_copy(update={field: value}),
+        )
+        if query.query_id == "q07"
+        else query
+        for query in EVALUATION_QUERIES
+    ]
+
+    with pytest.raises(ValueError, match=rf"does not satisfy its {field} filter"):
         validate_dataset(queries)
 
 

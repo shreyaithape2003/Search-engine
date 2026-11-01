@@ -584,7 +584,7 @@ python -m app.evaluation.run
 ```
 
 The runner validates a manually curated dataset of 24 educational queries and
-48 graded judgments over 20 documents from the deterministic development
+39 graded judgments over 20 documents from the deterministic development
 sample corpus. It uses stable fixture keys mapped to the samples' stable URLs,
 not database row IDs. The examples cover all four education levels, multiple
 subjects and resource types, exact and partial title searches, topic and

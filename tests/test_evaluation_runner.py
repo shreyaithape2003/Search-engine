@@ -26,7 +26,7 @@ def test_offline_evaluation_is_repeatable_and_report_is_readable(
 
     assert first == second
     assert first.document_count == 20
-    assert first.judgment_count == 48
+    assert first.judgment_count == 39
     assert len(first.per_query) == len(EVALUATION_QUERIES)
     assert len(database_urls) == 2
     assert all("edusearch-evaluation-" in url for url in database_urls)
@@ -40,7 +40,7 @@ def test_offline_evaluation_is_repeatable_and_report_is_readable(
     assert "EduSearch - Search Quality Evaluation" in report
     assert "Queries evaluated: 24" in report
     assert "Documents available: 20" in report
-    assert "Relevance judgments: 48" in report
+    assert "Relevance judgments: 39" in report
     assert "Precision@5:" in report
     assert "Recall@10:" in report
     assert "NDCG@10:" in report
